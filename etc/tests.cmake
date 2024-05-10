@@ -9,6 +9,9 @@ add_test(NAME ${compile_name}
 macro (ttest name)
   add_test(NAME ${name} COMMAND "${name}_sanitized")
   set_property(TEST ${name} PROPERTY FIXTURES_REQUIRED compile)
+
+  add_test(NAME unsanitized_${name} COMMAND "${name}")
+  set_property(TEST unsanitized_${name} PROPERTY FIXTURES_REQUIRED compile)
 endmacro (ttest)
 
 set_property(TEST ${compile_name} PROPERTY TIMEOUT 0)
@@ -68,9 +71,11 @@ add_custom_target (check2 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --s
 
 add_custom_target (check3 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --stop-on-failure --timeout 12 -R '^byte_stream_|^reassembler_|^wrapping|^recv|^send')
 
-add_custom_target (check4 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --stop-on-failure --timeout 12 -R '^net_interface')
+add_custom_target (check5 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --stop-on-failure --timeout 12 -R '^net_interface')
 
-add_custom_target (check5 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --stop-on-failure --timeout 12 -R '^net_interface|^router')
+add_custom_target (check6 COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --stop-on-failure --timeout 12 -R '^net_interface|^router')
+
+add_custom_target (check_unsanitized COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure --stop-on-failure --timeout 12 -R '^unsanitized')
 
 ###
 
