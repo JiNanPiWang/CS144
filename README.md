@@ -1,5 +1,5 @@
-Stanford CS 144 Networking Lab
-==============================
+Stanford CS 144 Networking Lab, Winter 2024
+===========================================
 
 forked from https://github.com/CS144/minnow.git
 
