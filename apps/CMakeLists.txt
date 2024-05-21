@@ -2,6 +2,8 @@ add_library (stream_copy STATIC bidirectional_stream_copy.cc)
 add_library(stream_sanitized EXCLUDE_FROM_ALL STATIC bidirectional_stream_copy.cc)
 target_compile_options(stream_sanitized PUBLIC ${SANITIZING_FLAGS})
 
+set(CMAKE_CXX_STANDARD 20)
+
 macro(add_app exec_name)
   add_executable("${exec_name}" "${exec_name}.cc")
   target_link_libraries("${exec_name}" stream_copy)
