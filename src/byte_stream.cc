@@ -14,9 +14,15 @@ void Writer::push( string data )
   if ( this->has_closed )
     throw std::runtime_error( "Writer has already been closed" );
   if ( data.size() > this->available_capacity() )
-    throw std::runtime_error( "Not enough capacity to push data" );
-  this->str += data;
-  this->cumulatively_bytes_writen += data.size();
+  {
+    this->str += data.substr( 0, data.size() - this->available_capacity() );
+    this->cumulatively_bytes_writen += data.size() - this->available_capacity();
+  }
+  else
+  {
+    this->str += data;
+    this->cumulatively_bytes_writen += data.size();
+  }
 }
 
 void Writer::close()
@@ -48,7 +54,7 @@ uint64_t Reader::bytes_popped() const
 
 string_view Reader::peek() const
 {
-  return {this->str.c_str(), 1};
+  return {this->str};
 }
 
 void Reader::pop( uint64_t len )
