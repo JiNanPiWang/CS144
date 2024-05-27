@@ -11,6 +11,8 @@ bool Writer::is_closed() const
 
 void Writer::push( string data )
 {
+  if (data.empty())
+    return;
   if ( this->has_closed )
     throw std::runtime_error( "Writer has already been closed" );
   if ( data.size() > this->available_capacity() )
