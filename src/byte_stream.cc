@@ -15,13 +15,13 @@ void Writer::push( string data )
     throw std::runtime_error( "Writer has already been closed" );
   if ( data.size() > this->available_capacity() )
   {
-    this->str += data.substr( 0, data.size() - this->available_capacity() );
-    this->cumulatively_bytes_writen += data.size() - this->available_capacity();
+    this->cumulatively_bytes_writen += this->available_capacity();
+    this->str += data.substr( 0, this->available_capacity() );
   }
   else
   {
-    this->str += data;
     this->cumulatively_bytes_writen += data.size();
+    this->str += data;
   }
 }
 
