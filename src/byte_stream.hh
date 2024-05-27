@@ -24,7 +24,7 @@ public:
 
 protected:
   // Please add any additional state to the ByteStream here, and not to the Writer and Reader interfaces.
-  std::stringstream stream;
+  std::string str{};
   bool has_closed = false;
   uint64_t cumulatively_bytes_writen = 0;
   uint64_t cumulatively_bytes_popped = 0;
