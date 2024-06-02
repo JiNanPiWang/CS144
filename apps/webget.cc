@@ -28,7 +28,7 @@ void get_URL( const string& host, const string& path )
   tcp_socket.write( http_request );
 
   // 读取服务器响应并存储在 stringstream 中
-  stringstream answer;
+  ostringstream answer;
   while ( true ) // 我感觉套接字的eof不是一个直观的概念，在这里，
   {
     string buffer;
