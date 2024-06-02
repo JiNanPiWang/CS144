@@ -1,6 +1,7 @@
 #pragma once
 
 #include "byte_stream.hh"
+#include <map>
 
 class Reassembler
 {
@@ -42,4 +43,6 @@ public:
 
 private:
   ByteStream output_; // the Reassembler writes to this ByteStream
+  std::map<int, std::string> fragments_map;
+  uint64_t pending_bytes_; // stores the number of bytes pending reassembly
 };
