@@ -13,16 +13,21 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
 
   // 如果first_index >= current_pos，就正常存
   // 如果first_index < current_pos <= first_index + data.size()的，也按current_pos插入
+
+  // first_index + data.size() <= current_pos + this->writer().available_capacity()
+  // 只能插current_pos到current_pos + this->writer().available_capacity()的内容进来
   if (first_index >= current_pos)
   {
-    if (data.size() > this->writer().available_capacity())
-      data = data.substr( 0, this->writer().available_capacity() );
+    if (first_index + data.size() > current_pos + this->writer().available_capacity())
+      data = data.substr( 0, current_pos + this->writer().available_capacity() - first_index );
   }
   else // first_index < current_pos <= first_index + data.size()
   {
     if (first_index + data.size() >= current_pos)
       data = data.substr( current_pos - first_index );
-    first_index += current_pos - first_index;
+    if (current_pos + this->writer().available_capacity() < data.size() + first_index)
+      data = data.substr( 0, this->writer().available_capacity() );
+    first_index = current_pos;
   }
 
   pending_bytes_ += data.size();
