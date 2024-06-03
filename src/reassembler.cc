@@ -44,16 +44,19 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   if ( is_last_substring && !changed_tail )
     close_flag = true;
 
-  while ( fragments_map.find( current_pos ) != fragments_map.end() ) // 可以插入了
-  {
-    auto& cur_str = fragments_map.at( current_pos );
-    auto new_pos = current_pos + cur_str.size();
 
+  while ( !fragments_map.empty() && fragments_map.begin()->first <= current_pos) // 可以插入了，只插入在范围内的
+  {
+    auto& cur_str = fragments_map.begin()->second;
+    pending_bytes_ -= cur_str.size();
+    // 修剪字符串
+    if (fragments_map.begin()->first != current_pos)
+      cur_str = cur_str.substr( current_pos - fragments_map.begin()->first );
+
+    auto new_pos = current_pos + cur_str.size();
     this->output_.writer().push( cur_str );
 
-    pending_bytes_ -= cur_str.size();
-    fragments_map.erase( current_pos );
-
+    fragments_map.erase( fragments_map.begin() );
     current_pos = new_pos;
   }
 
