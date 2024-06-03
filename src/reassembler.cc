@@ -30,6 +30,8 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   {
     if (first_index + data.size() >= current_pos)
       data = data.substr( current_pos - first_index );
+    else
+      return;
     if (current_pos + this->writer().available_capacity() < data.size() + first_index)
     {
       data = data.substr( 0, this->writer().available_capacity() );
