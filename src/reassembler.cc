@@ -7,8 +7,23 @@ using namespace std;
 
 void Reassembler::insert( uint64_t first_index, string data, bool is_last_substring )
 {
-  if ( data.size() + bytes_pending() > this->writer().available_capacity() )
+  // 如果available_capacity < data.size()，map就只存substr，并且只要有空间，就读
+  if ( bytes_pending() >= this->writer().available_capacity() )
     return;
+
+  // 如果first_index >= current_pos，就正常存
+  // 如果first_index < current_pos <= first_index + data.size()的，也按current_pos插入
+  if (first_index >= current_pos)
+  {
+    if (data.size() > this->writer().available_capacity())
+      data = data.substr( 0, this->writer().available_capacity() );
+  }
+  else // first_index < current_pos <= first_index + data.size()
+  {
+    if (first_index + data.size() >= current_pos)
+      data = data.substr( current_pos - first_index );
+    first_index += current_pos - first_index;
+  }
 
   pending_bytes_ += data.size();
   fragments_map[first_index] = std::move( data );
