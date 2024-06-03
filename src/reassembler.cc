@@ -14,9 +14,10 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   while (fragments_map.find(current_pos) != fragments_map.end()) // 可以插入了
   {
     auto& cur_str = fragments_map.at( current_pos );
-    current_pos += cur_str.size();
+    auto new_pos = current_pos + cur_str.size();
     this->output_.writer().push( cur_str);
     fragments_map.erase( current_pos );
+    current_pos = new_pos;
   }
 
   if (close_flag && fragments_map.empty())
