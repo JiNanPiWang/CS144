@@ -44,7 +44,6 @@ public:
 private:
   ByteStream output_; // the Reassembler writes to this ByteStream
   std::map<uint64_t, std::string> fragments_map{};
-  uint64_t pending_bytes_ = 0; // stores the number of bytes pending reassembly
   uint64_t current_pos = 0;
   bool close_flag = false;
 };

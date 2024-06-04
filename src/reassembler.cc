@@ -26,13 +26,13 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
       changed_tail = true;
     }
   }
-  else // cur在fir左边，详见check1.md配图
+  else // cur在fir右边，详见check1.md配图
   {
-    if (first_index + data.size() >= current_pos)
+    if (first_index + data.size() >= current_pos) // 从current_pos开始截取data
       data = data.substr( current_pos - first_index );
     else
       return;
-    if (current_pos + this->writer().available_capacity() < data.size() + first_index)
+    if (data.size() > this->writer().available_capacity()) // 只取容量内的data
     {
       data = data.substr( 0, this->writer().available_capacity() );
       changed_tail = true;
