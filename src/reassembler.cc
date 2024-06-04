@@ -51,6 +51,12 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   {
     auto& cur_str = fragments_map.begin()->second;
     pending_bytes_ -= cur_str.size();
+    // 判断字符串是否在范围内，不在，就不算
+    if (fragments_map.begin()->first + cur_str.size() < current_pos)
+    {
+      fragments_map.erase( fragments_map.begin() );
+      continue;
+    }
     // 修剪字符串
     if (fragments_map.begin()->first != current_pos)
       cur_str = cur_str.substr( current_pos - fragments_map.begin()->first );
