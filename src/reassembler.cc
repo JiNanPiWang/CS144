@@ -40,7 +40,9 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
     first_index = current_pos;
   }
 
-  pending_bytes_ += data.size();
+  // pending_bytes_ += data.size();
+  if (fragments_map.find(first_index) != fragments_map.end() && data.size() <= fragments_map[first_index].size())
+    return;
   fragments_map[first_index] = std::move( data );
 
   if ( is_last_substring && !changed_tail )
@@ -50,7 +52,7 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
   while ( !fragments_map.empty() && fragments_map.begin()->first <= current_pos) // 可以插入了，只插入在范围内的
   {
     auto& cur_str = fragments_map.begin()->second;
-    pending_bytes_ -= cur_str.size();
+    //  pending_bytes_ -= cur_str.size();
     // 判断字符串是否在范围内，不在，就不算
     if (fragments_map.begin()->first + cur_str.size() < current_pos)
     {
