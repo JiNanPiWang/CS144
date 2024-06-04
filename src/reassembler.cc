@@ -18,7 +18,7 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
 
   // first_index + data.size() <= current_pos + this->writer().available_capacity()
   // 只能插current_pos到current_pos + this->writer().available_capacity()的内容进来
-  if (first_index >= current_pos) // cur在fir左边
+  if (first_index >= current_pos) // cur在fir左边，存available_capacity内的内容
   {
     if (first_index + data.size() > current_pos + this->writer().available_capacity())
     {
@@ -74,5 +74,19 @@ void Reassembler::insert( uint64_t first_index, string data, bool is_last_substr
 
 uint64_t Reassembler::bytes_pending() const
 {
-  return pending_bytes_;
+  if (fragments_map.empty())
+    return 0;
+  uint64_t pos = fragments_map.begin()->first;
+  uint64_t result = 0;
+  for (auto &p : fragments_map)
+  {
+    if (p.first >= pos)
+      result += p.second.size();
+    else if (p.first + p.second.size() >= pos)
+      result += p.first + p.second.size() - pos;
+    else
+      continue;
+    pos = p.first + p.second.size();
+  }
+  return result;
 }
