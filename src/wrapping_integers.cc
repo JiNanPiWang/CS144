@@ -21,7 +21,7 @@ uint64_t Wrap32::unwrap( Wrap32 zero_point, uint64_t checkpoint ) const
   // n或n+1，checkpoint处于(n - 1) * max2_32到n * max2_32到(n + 1) * max2_32之间
   if ((checkpoint > pos_0) && (checkpoint - pos_0 > max2_32 / 2))
     return pos_0 + (n + 1) * max2_32;
-  else if ((pos_0 > checkpoint) && (pos_0 - checkpoint > max2_32 / 2))
+  else if ((pos_0 > checkpoint) && (pos_0 - checkpoint > max2_32 / 2) && (n > 0))
     return pos_0 + (n - 1) * max2_32;
   return pos_0 + n * max2_32;
 }
