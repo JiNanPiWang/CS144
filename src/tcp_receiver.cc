@@ -7,6 +7,8 @@ void TCPReceiver::receive( TCPSenderMessage message )
   // Your code here.
   if ( message.RST )
     this->reassembler_.reader().set_error();
+  if (message.FIN)
+    this->reassembler_.close();
   if ( message.SYN )
     ISN = message.seqno;
   else if (!ackno.has_value())
