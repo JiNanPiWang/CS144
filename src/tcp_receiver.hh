@@ -28,6 +28,6 @@ public:
 private:
   Reassembler reassembler_;
   Wrap32 ISN{0};
-  std::optional<Wrap32> ackno{std::nullopt};
+  std::optional<Wrap32> ackno_base {std::nullopt}; // ISN + SYN + FIN，剩下的是加写成功了几个
   uint64_t absolute_seqno {0};
 };
