@@ -28,5 +28,6 @@ public:
 private:
   Reassembler reassembler_;
   Wrap32 ISN{0};
+  std::optional<Wrap32> ackno{std::nullopt};
   uint64_t absolute_seqno {0};
 };

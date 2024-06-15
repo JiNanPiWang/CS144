@@ -15,12 +15,13 @@ void TCPReceiver::receive( TCPSenderMessage message )
                         message.payload,
                         message.FIN );
   absolute_seqno += message.sequence_length();
+  ackno = ackno.value_or(ISN) + message.sequence_length();
 }
 
 TCPReceiverMessage TCPReceiver::send() const
 {
   // 发送ackno
-  return { absolute_seqno == 0 ? std::nullopt : std::optional<Wrap32>(Wrap32(absolute_seqno)),
+  return { ackno,
            static_cast<uint16_t>(this->reassembler_.reader().getCapacity()),
            this->reassembler_.reader().has_error()};
 }
