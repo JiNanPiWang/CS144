@@ -15,9 +15,9 @@ void TCPReceiver::receive( TCPSenderMessage message )
     return;
   else
     this->reassembler_.insert(
-                        message.seqno.unwrap( ISN, absolute_seqno ) - 1,
-                        message.payload,
-                        message.FIN );
+      message.seqno.unwrap( ISN, absolute_seqno ) - 1,
+      message.payload,
+      message.FIN );
   absolute_seqno += message.sequence_length();
   ackno = ackno.value_or(ISN) + message.sequence_length();
 }
@@ -25,7 +25,8 @@ void TCPReceiver::receive( TCPSenderMessage message )
 TCPReceiverMessage TCPReceiver::send() const
 {
   // 发送ackno
+  auto window_size = this->reassembler_.reader().getCapacity();
   return { ackno,
-           static_cast<uint16_t>(this->reassembler_.reader().getCapacity()),
+           (window_size > UINT16_MAX) ? uint16_t (UINT16_MAX) : static_cast<uint16_t>(window_size),
            this->reassembler_.reader().has_error()};
 }
