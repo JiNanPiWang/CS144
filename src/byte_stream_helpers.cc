@@ -55,3 +55,7 @@ const Writer& ByteStream::writer() const
 
   return static_cast<const Writer&>( *this ); // NOLINT(*-downcast)
 }
+uint64_t ByteStream::getCapacity() const
+{
+  return capacity_;
+}
