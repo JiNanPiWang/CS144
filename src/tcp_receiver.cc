@@ -9,6 +9,8 @@ void TCPReceiver::receive( TCPSenderMessage message )
     this->reassembler_.reader().set_error();
   if ( message.SYN )
     ISN = message.seqno;
+  else if (!ackno.has_value())
+    return;
   else
     this->reassembler_.insert(
                         message.seqno.unwrap( ISN, absolute_seqno ) - 1,
