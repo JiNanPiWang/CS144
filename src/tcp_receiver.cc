@@ -20,7 +20,7 @@ void TCPReceiver::receive( TCPSenderMessage message )
 TCPReceiverMessage TCPReceiver::send() const
 {
   // 发送ackno
-  return { Wrap32(absolute_seqno),
+  return { absolute_seqno == 0 ? std::nullopt : std::optional<Wrap32>(Wrap32(absolute_seqno)),
            static_cast<uint16_t>(this->reassembler_.reader().getCapacity()),
            this->reassembler_.reader().has_error()};
 }
