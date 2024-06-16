@@ -92,6 +92,7 @@ uint64_t Reassembler::bytes_pending() const
   }
   return result;
 }
-void Reassembler::close() {
-  this->output_.writer().close();
+
+void Reassembler::set_close_flag() {
+  this->close_flag = true;
 }
