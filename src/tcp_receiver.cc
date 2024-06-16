@@ -6,8 +6,6 @@ void TCPReceiver::receive( TCPSenderMessage message )
 {
   if ( message.RST )
     this->reassembler_.reader().set_error();
-  if (message.FIN)
-    this->reassembler_.close();
   if ( message.SYN )
     ISN = message.seqno;
   else if (!ackno_base.has_value())
@@ -24,6 +22,8 @@ void TCPReceiver::receive( TCPSenderMessage message )
       message.FIN );
   absolute_seqno += message.sequence_length();
   ackno_base = ackno_base.value_or(ISN) + message.SYN + message.FIN;
+  if (message.FIN)
+    this->reassembler_.close();
 }
 
 TCPReceiverMessage TCPReceiver::send() const
