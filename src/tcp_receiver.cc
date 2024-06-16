@@ -4,7 +4,6 @@ using namespace std;
 
 void TCPReceiver::receive( TCPSenderMessage message )
 {
-  // Your code here.
   if ( message.RST )
     this->reassembler_.reader().set_error();
   if (message.FIN)
@@ -12,6 +11,11 @@ void TCPReceiver::receive( TCPSenderMessage message )
   if ( message.SYN )
     ISN = message.seqno;
   else if (!ackno_base.has_value())
+    return;
+  // 应该是seqno位置-当前位置 > this->reassembler_.writer().available_capacity(), UINT16_MAX
+  // 但是比较难实现，下面是无奈之举，简单判断是不是在ISN之前
+  else if (message.seqno.unwrap(ISN, absolute_seqno) <=
+            ISN.unwrap(ISN, absolute_seqno))
     return;
   else
     this->reassembler_.insert(
