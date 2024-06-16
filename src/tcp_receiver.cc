@@ -15,9 +15,8 @@ void TCPReceiver::receive( TCPSenderMessage message )
   else if (message.seqno.unwrap(ISN, absolute_seqno) <=
             ISN.unwrap(ISN, absolute_seqno))
     return;
-  else
-    this->reassembler_.insert(
-      message.seqno.unwrap( ISN, absolute_seqno ) - 1,
+  this->reassembler_.insert(
+      message.seqno.unwrap( ISN, absolute_seqno ) - 1 + message.SYN,
       message.payload,
       message.FIN );
   absolute_seqno += message.sequence_length();
