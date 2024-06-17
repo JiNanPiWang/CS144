@@ -32,8 +32,9 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
-  // Your code here.
-  (void)msg;
+  if (msg.ackno.has_value())
+    ackno_ = msg.ackno.value();
+  window_size_ = msg.window_size;
 }
 
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
