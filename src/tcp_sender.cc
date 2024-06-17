@@ -17,14 +17,14 @@ uint64_t TCPSender::consecutive_retransmissions() const
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
-  // Your code here.
-  (void)transmit;
+  if (window_size == TCPConfig::MAX_PAYLOAD_SIZE + 1)
+    transmit( { isn_, true, "", false, false } );
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
 {
   // Your code here.
-  return {};
+  return { Wrap32{ 0 }, false, "", false, false};
 }
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
