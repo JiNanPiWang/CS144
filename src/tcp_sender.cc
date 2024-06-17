@@ -5,8 +5,7 @@ using namespace std;
 
 uint64_t TCPSender::sequence_numbers_in_flight() const
 {
-  // Your code here.
-  return {};
+  return seqno_.getRawValue() - ackno_.getRawValue();
 }
 
 uint64_t TCPSender::consecutive_retransmissions() const
@@ -19,6 +18,7 @@ void TCPSender::push( const TransmitFunction& transmit )
 {
   if (window_size_ == TCPConfig::MAX_PAYLOAD_SIZE + 1) {
     transmit( { isn_, true, "", false, false } );
+    ackno_ = isn_;
     seqno_ = isn_ + 1;
     window_size_ = 1;
   }
