@@ -15,11 +15,17 @@ uint64_t TCPSender::consecutive_retransmissions() const
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
-  if (window_size_ == TCPConfig::MAX_PAYLOAD_SIZE + 1) {
+  if (window_size_ == TCPConfig::MAX_PAYLOAD_SIZE + 1)
+  {
     transmit( { isn_, true, "", false, false } );
     ackno_ = isn_;
     seqno_ = isn_ + 1;
     window_size_ = 1;
+  }
+  else if (this->input_.reader().bytes_buffered() + sequence_numbers_in_flight() + 1 == window_size_)
+  {
+    // 当ByteStream中的所有数据都已读取并发送完毕，并且发送方没有更多的数据需要发送时。FIN
+    transmit( {seqno_, false, string(this->input_.reader().peek()), true, false} );
   }
   else if (this->input_.reader().bytes_buffered())
   {
