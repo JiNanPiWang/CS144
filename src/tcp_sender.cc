@@ -69,6 +69,7 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
     if ( ackno_ == isn_ )
       transmit( { isn_, true, "", false, false } );
     else {
+      if (!outstanding_segments.empty())
         transmit( { outstanding_segments.front().first, false,
                   outstanding_segments.front().second, false, false } );
     }
