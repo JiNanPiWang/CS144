@@ -57,4 +57,5 @@ private:
   uint64_t retrans_cnt = 0;
   uint64_t retrans_timer = 0;
   uint64_t retrans_RTO = 0;
+  std::queue<std::pair<Wrap32, std::string>> outstanding_segments{};
 };

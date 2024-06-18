@@ -26,8 +26,11 @@ void TCPSender::push( const TransmitFunction& transmit )
     auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
     auto push_num = min( static_cast<uint64_t>(window_size_), this->reader().bytes_buffered() ) -
                     sequence_numbers_in_flight(); // push的数量
+    if (push_num == 0) // 这里不能用make_empty_message方法，因为这里也是用的transmit，所以无需考虑
+      return;
     transmit( { seqno_, false,
                 string(this->input_.reader().peek().substr(push_pos, push_num)), false, false } );
+    outstanding_segments.emplace( seqno_, string( this->input_.reader().peek().substr( push_pos, push_num ) ) );
     seqno_ = seqno_ + push_num;
   }
 }
@@ -39,11 +42,16 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
+  // receive后，测试的调用会自动触发push
   if (msg.ackno.has_value()) {
     auto pop_num = min( static_cast<uint64_t>(msg.ackno->getRawValue() - ackno_.getRawValue()),
                         this->reader().bytes_buffered() );
     this->input_.reader().pop(pop_num);
     ackno_ = msg.ackno.value();
+
+    // 当前ackno已经超过了之前的
+    while (!outstanding_segments.empty() && ackno_.getRawValue() > outstanding_segments.front().first.getRawValue())
+      outstanding_segments.pop();
   }
   window_size_ = msg.window_size;
   retrans_cnt = 0;
@@ -61,9 +69,8 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
     if ( ackno_ == isn_ )
       transmit( { isn_, true, "", false, false } );
     else {
-      transmit( { ackno_, false,
-                  string( this->input_.reader().peek().substr( 0, seqno_.getRawValue() -  ackno_.getRawValue()) ),
-                  false, false } );
+        transmit( { outstanding_segments.front().first, false,
+                  outstanding_segments.front().second, false, false } );
     }
     retrans_timer = 0;
     retrans_cnt++;
