@@ -24,9 +24,9 @@ void TCPSender::push( const TransmitFunction& transmit )
   }
   else if (this->input_.reader().bytes_buffered())
   {
-    auto push_pos = seqno_.getRawValue() - ackno_.getRawValue();
-    auto push_num = min( static_cast<uint64_t>(window_size_),
-                         this->reader().bytes_buffered() - sequence_numbers_in_flight() );
+    auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
+    auto push_num = min( static_cast<uint64_t>(window_size_), this->reader().bytes_buffered() ) -
+                    sequence_numbers_in_flight(); // push的数量
     transmit( { seqno_, false,
                 string(this->input_.reader().peek().substr(push_pos, push_num)), false, false } );
     seqno_ = seqno_ + push_num;
@@ -35,7 +35,6 @@ void TCPSender::push( const TransmitFunction& transmit )
 
 TCPSenderMessage TCPSender::make_empty_message() const
 {
-  // Your code here.
   return { seqno_, false, "", false, false};
 }
 
