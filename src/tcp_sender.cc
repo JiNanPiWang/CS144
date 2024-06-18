@@ -24,8 +24,12 @@ void TCPSender::push( const TransmitFunction& transmit )
   }
   else if (this->input_.reader().bytes_buffered())
   {
-    transmit( { seqno_, false, string(this->input_.reader().peek()), false, false } );
-    seqno_ = seqno_ + this->input_.reader().bytes_buffered();
+    auto push_pos = seqno_.getRawValue() - ackno_.getRawValue();
+    auto push_num = min( static_cast<uint64_t>(window_size_),
+                         this->reader().bytes_buffered() - sequence_numbers_in_flight() );
+    transmit( { seqno_, false,
+                string(this->input_.reader().peek().substr(push_pos, push_num)), false, false } );
+    seqno_ = seqno_ + push_num;
   }
 }
 
