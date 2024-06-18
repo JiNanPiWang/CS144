@@ -22,6 +22,11 @@ void TCPSender::push( const TransmitFunction& transmit )
     seqno_ = isn_ + 1;
     window_size_ = 1;
   }
+  else if (this->input_.reader().bytes_buffered())
+  {
+    transmit( { seqno_, false, string(this->input_.reader().peek()), false, false } );
+    seqno_ = seqno_ + this->input_.reader().bytes_buffered();
+  }
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
@@ -32,8 +37,12 @@ TCPSenderMessage TCPSender::make_empty_message() const
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
-  if (msg.ackno.has_value())
+  if (msg.ackno.has_value()) {
+    auto pop_num = min( static_cast<uint64_t>(msg.ackno->getRawValue() - ackno_.getRawValue()),
+                        this->reader().bytes_buffered() );
+    this->input_.reader().pop(pop_num);
     ackno_ = msg.ackno.value();
+  }
   window_size_ = msg.window_size;
 }
 
