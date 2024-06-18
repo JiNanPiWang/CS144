@@ -18,7 +18,9 @@ public:
   /* Construct TCP sender with given default Retransmission Timeout and possible ISN */
   TCPSender( ByteStream&& input, Wrap32 isn, uint64_t initial_RTO_ms )
     : input_( std::move( input ) ), isn_( isn ), initial_RTO_ms_( initial_RTO_ms )
-  {}
+  {
+    retrans_RTO = initial_RTO_ms;
+  }
 
   /* Generate an empty TCPSenderMessage */
   TCPSenderMessage make_empty_message() const;
@@ -52,4 +54,7 @@ private:
   uint16_t window_size_ = TCPConfig::MAX_PAYLOAD_SIZE + 1; // 比最大的大1
   Wrap32 seqno_{0};
   Wrap32 ackno_{0};
+  uint64_t retrans_cnt = 0;
+  uint64_t retrans_timer = 0;
+  uint64_t retrans_RTO = 0;
 };

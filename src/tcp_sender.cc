@@ -47,12 +47,26 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     ackno_ = msg.ackno.value();
   }
   window_size_ = msg.window_size;
+  retrans_cnt = 0;
+  retrans_timer = 0;
+  retrans_RTO = initial_RTO_ms_;
 }
 
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
 {
-  // Your code here.
-  (void)ms_since_last_tick;
-  (void)transmit;
-  (void)initial_RTO_ms_;
+  // retransmit ackno_ to seqno_ - 1
+  retrans_timer += ms_since_last_tick;
+  retrans_cnt++;
+  if ( retrans_timer >= retrans_RTO ) {
+    if (window_size_ != 0)
+      retrans_RTO <<= 1;
+    if ( ackno_ == isn_ )
+      transmit( { isn_, true, "", false, false } );
+    else {
+      transmit( { ackno_, false,
+                  string( this->input_.reader().peek().substr( 0, seqno_.getRawValue() -  ackno_.getRawValue()) ),
+                  false, false } );
+    }
+    retrans_timer = 0;
+  }
 }
