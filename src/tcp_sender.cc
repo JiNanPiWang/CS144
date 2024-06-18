@@ -10,8 +10,7 @@ uint64_t TCPSender::sequence_numbers_in_flight() const
 
 uint64_t TCPSender::consecutive_retransmissions() const
 {
-  // Your code here.
-  return {};
+  return retrans_cnt;
 }
 
 void TCPSender::push( const TransmitFunction& transmit )
@@ -56,7 +55,6 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
 {
   // retransmit ackno_ to seqno_ - 1
   retrans_timer += ms_since_last_tick;
-  retrans_cnt++;
   if ( retrans_timer >= retrans_RTO ) {
     if (window_size_ != 0)
       retrans_RTO <<= 1;
@@ -68,5 +66,6 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
                   false, false } );
     }
     retrans_timer = 0;
+    retrans_cnt++;
   }
 }
