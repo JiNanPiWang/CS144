@@ -22,10 +22,18 @@ void TCPSender::push( const TransmitFunction& transmit )
     seqno_ = isn_ + 1;
     window_size_ = 1;
   }
-  else if (this->input_.reader().bytes_buffered() + sequence_numbers_in_flight() + 1 == window_size_)
+  else if (this->input_.reader().bytes_buffered() == sequence_numbers_in_flight() && sequence_numbers_in_flight() + 1 == window_size_)
   {
-    // 当ByteStream中的所有数据都已读取并发送完毕，并且发送方没有更多的数据需要发送时。FIN
-    transmit( {seqno_, false, string(this->input_.reader().peek()), true, false} );
+    // 当ByteStream中的所有数据都已读取并发送完毕，并且发送方没有更多的数据需要发送时，同时窗口大小正好大一个。发FIN
+    uint16_t push_num = 0;
+    if (window_expand_)
+      push_num = window_expand_ - 1;
+    auto str_size = this->input_.reader().peek().size();
+    if (push_num)
+      transmit( {seqno_, false,
+                string(this->input_.reader().peek()).substr(str_size - push_num), true, false} );
+    else
+      transmit( {seqno_, false, "", true, false} );
   }
   else if (this->input_.reader().bytes_buffered())
   {
@@ -59,6 +67,10 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     while (!outstanding_segments.empty() && ackno_.getRawValue() > outstanding_segments.front().first.getRawValue())
       outstanding_segments.pop();
   }
+  if (msg.window_size > window_size_)
+    window_expand_ = msg.window_size - window_size_;
+  else
+    window_expand_ = 0;
   window_size_ = msg.window_size;
   retrans_cnt = 0;
   retrans_timer = 0;
