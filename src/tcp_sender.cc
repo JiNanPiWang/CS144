@@ -36,10 +36,10 @@ void TCPSender::push( const TransmitFunction& transmit )
     if (this->input_.reader().bytes_buffered() >= window_size_)
       return;
     // start from fake ackno
-    auto push_num = min( static_cast<uint32_t>(window_size_), fake_ackno_.getRawValue() - ackno_.getRawValue());
+    auto push_pos = min( static_cast<uint32_t>(window_size_), fake_ackno_.getRawValue() - ackno_.getRawValue());
     transmit( { seqno_, false,
-                string(this->input_.reader().peek().substr(push_num)), true, false } );
-    seqno_ = seqno_ + push_num + 1;
+                string(this->input_.reader().peek().substr(push_pos)), true, false } );
+    seqno_ = seqno_ + this->input_.reader().peek().substr(push_pos).size() + 1;
   }
   else if (this->input_.reader().bytes_buffered())
   {
