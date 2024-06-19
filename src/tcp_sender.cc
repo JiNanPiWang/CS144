@@ -57,6 +57,10 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 {
   // receive后，测试的调用会自动触发push
   if (msg.ackno.has_value()) {
+    // 大部分情况下ackno不能大于seqno，除非卡在0左右
+    auto &new_ackno = msg.ackno.value();
+    if (new_ackno.getRawValue() < UINT32_MAX - UINT16_MAX && new_ackno.getRawValue() > seqno_.getRawValue())
+      return;
     auto pop_num = min( static_cast<uint64_t>(msg.ackno->getRawValue() - ackno_.getRawValue()),
                         this->reader().bytes_buffered() );
     this->input_.reader().pop(pop_num);
