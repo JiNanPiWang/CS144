@@ -52,7 +52,7 @@ private:
   Wrap32 isn_;
   uint64_t initial_RTO_ms_;
   uint16_t window_size_ = TCPConfig::MAX_PAYLOAD_SIZE + 1; // 比最大的大1
-  uint16_t window_expand_ = 0;
+  bool has_SYN = false;
   Wrap32 seqno_{0};
   Wrap32 ackno_{0};
   uint64_t retrans_cnt = 0;

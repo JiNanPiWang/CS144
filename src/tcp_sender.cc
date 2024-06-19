@@ -15,14 +15,16 @@ uint64_t TCPSender::consecutive_retransmissions() const
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
-  if (window_size_ == TCPConfig::MAX_PAYLOAD_SIZE + 1)
+  TCPSenderMessage to_trans{seqno_, false, "", false, false };
+  if (!has_SYN)
   {
-    transmit( { isn_, true, "", false, false } );
+    to_trans.seqno = isn_;
+    to_trans.SYN = true;
     ackno_ = isn_;
     seqno_ = isn_ + 1;
-    window_size_ = 1;
+    has_SYN = true;
   }
-  else if (this->input_.writer().is_closed())
+  if (this->input_.writer().is_closed())
   {
     // 测试会调用close方法，就关闭了
     // 发送window_size_ - sequence_numbers_in_flight() - 1
@@ -37,8 +39,10 @@ void TCPSender::push( const TransmitFunction& transmit )
       return;
     // start from fake ackno
     auto push_pos = min( static_cast<uint32_t>(window_size_), fake_ackno_.getRawValue() - ackno_.getRawValue());
-    transmit( { seqno_, false,
-                string(this->input_.reader().peek().substr(push_pos)), true, false } );
+
+    to_trans.payload = string(this->input_.reader().peek().substr(push_pos));
+    to_trans.FIN = true;
+
     seqno_ = seqno_ + this->input_.reader().peek().substr(push_pos).size() + 1;
   }
   else if (this->input_.reader().bytes_buffered())
@@ -48,11 +52,15 @@ void TCPSender::push( const TransmitFunction& transmit )
                     sequence_numbers_in_flight(); // push的数量
     if (push_num == 0) // 这里不能用make_empty_message方法，因为这里也是用的transmit，所以无需考虑
       return;
-    transmit( { seqno_, false,
-                string(this->input_.reader().peek().substr(push_pos, push_num)), false, false } );
+
+    to_trans.payload = string(this->input_.reader().peek().substr(push_pos, push_num));
+
     outstanding_segments.emplace( seqno_, string( this->input_.reader().peek().substr( push_pos, push_num ) ) );
     seqno_ = seqno_ + push_num;
   }
+  else if (!to_trans.SYN) // 什么都不是
+    return;
+  transmit( to_trans );
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
@@ -77,10 +85,6 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     while (!outstanding_segments.empty() && ackno_.getRawValue() > outstanding_segments.front().first.getRawValue())
       outstanding_segments.pop();
   }
-  if (msg.window_size > window_size_)
-    window_expand_ = msg.window_size - window_size_;
-  else
-    window_expand_ = 0;
   window_size_ = msg.window_size;
   retrans_cnt = 0;
   retrans_timer = 0;
