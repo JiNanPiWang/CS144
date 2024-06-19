@@ -28,6 +28,9 @@ void TCPSender::push( const TransmitFunction& transmit )
   {
     // 测试会调用close方法，就关闭了
     // 发送window_size_ - sequence_numbers_in_flight() - 1
+    if (had_FIN)
+      return;
+
     auto fake_ackno_ = ackno_;
     auto fake_segments = outstanding_segments;
     while (!fake_segments.empty())
@@ -44,6 +47,8 @@ void TCPSender::push( const TransmitFunction& transmit )
     to_trans.FIN = true;
 
     seqno_ = seqno_ + this->input_.reader().peek().substr(push_pos).size() + 1;
+
+    had_FIN = true;
   }
   else if (this->input_.reader().bytes_buffered())
   {
