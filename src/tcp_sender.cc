@@ -22,18 +22,17 @@ void TCPSender::push( const TransmitFunction& transmit )
     seqno_ = isn_ + 1;
     window_size_ = 1;
   }
-  else if (this->input_.reader().bytes_buffered() == sequence_numbers_in_flight() && sequence_numbers_in_flight() + 1 == window_size_)
+  else if (this->input_.writer().is_closed())
   {
     // 当ByteStream中的所有数据都已读取并发送完毕，并且发送方没有更多的数据需要发送时，同时窗口大小正好大一个。发FIN
-    uint16_t push_num = 0;
-    if (window_expand_)
-      push_num = window_expand_ - 1;
+    // 上面是错误的。测试会调用close方法，就关闭了
+    // 发送window_size_ - sequence_numbers_in_flight() - 1
+    auto push_num = window_size_ - sequence_numbers_in_flight() - 1;
+    if (push_num > window_size_) // close会发一个空的""默认push一下，这个别管
+      return;
     auto str_size = this->input_.reader().peek().size();
-    if (push_num)
-      transmit( {seqno_, false,
-                string(this->input_.reader().peek()).substr(str_size - push_num), true, false} );
-    else
-      transmit( {seqno_, false, "", true, false} );
+    transmit( { seqno_, false,
+                string(this->input_.reader().peek().substr(str_size - push_num)), true, false } );
   }
   else if (this->input_.reader().bytes_buffered())
   {
