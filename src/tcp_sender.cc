@@ -24,15 +24,22 @@ void TCPSender::push( const TransmitFunction& transmit )
   }
   else if (this->input_.writer().is_closed())
   {
-    // 当ByteStream中的所有数据都已读取并发送完毕，并且发送方没有更多的数据需要发送时，同时窗口大小正好大一个。发FIN
-    // 上面是错误的。测试会调用close方法，就关闭了
+    // 测试会调用close方法，就关闭了
     // 发送window_size_ - sequence_numbers_in_flight() - 1
-    auto push_num = window_size_ - sequence_numbers_in_flight() - 1;
-    if (push_num > window_size_) // close会发一个空的""默认push一下，这个别管
+    auto fake_ackno_ = ackno_;
+    auto fake_segments = outstanding_segments;
+    while (!fake_segments.empty())
+    {
+      fake_ackno_ = fake_segments.front().first + fake_segments.front().second.size();
+      fake_segments.pop();
+    }
+    if (this->input_.reader().bytes_buffered() >= window_size_)
       return;
-    auto str_size = this->input_.reader().peek().size();
+    // start from fake ackno
+    auto push_num = min( static_cast<uint32_t>(window_size_), fake_ackno_.getRawValue() - ackno_.getRawValue());
     transmit( { seqno_, false,
-                string(this->input_.reader().peek().substr(str_size - push_num)), true, false } );
+                string(this->input_.reader().peek().substr(push_num)), true, false } );
+    seqno_ = seqno_ + push_num + 1;
   }
   else if (this->input_.reader().bytes_buffered())
   {
