@@ -15,7 +15,7 @@ uint64_t TCPSender::consecutive_retransmissions() const
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
-  while (sequence_numbers_in_flight() < window_size_)
+  while (sequence_numbers_in_flight() < window_size_ || (!had_FIN && this->input_.writer().is_closed()) )
   {
     TCPSenderMessage to_trans { seqno_, false, "", false, false };
     if ( !has_SYN ) // 还没开始，准备SYN
@@ -24,9 +24,11 @@ void TCPSender::push( const TransmitFunction& transmit )
       to_trans.SYN = true;
       ackno_ = isn_;
       seqno_ = isn_ + 1;
+      window_size_ = 1;
       has_SYN = true;
     }
-    if ( this->input_.writer().is_closed() ) // 已经被关闭了，准备FIN
+    // 已经被关闭了，准备FIN，且有空间发FIN
+    if ( this->input_.writer().is_closed() && this->reader().bytes_buffered() < window_size_ )
     {
       // 测试会调用close方法，就关闭了
       // 发送window_size_ - sequence_numbers_in_flight() - 1
@@ -96,9 +98,15 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
         return;
     }
 
-    auto pop_num = min( static_cast<uint64_t>(msg.ackno->getRawValue() - ackno_.getRawValue()),
-                        this->reader().bytes_buffered() );
-    this->input_.reader().pop(pop_num);
+    // 如果发过来的不是对SYN的ACK，我们才pop
+    auto absolute_ack_pos = msg.ackno->unwrap(isn_, this->reader().bytes_popped());
+    if (absolute_ack_pos != 1)
+    {
+      auto pop_num = min( static_cast<uint64_t>( msg.ackno->getRawValue() - ackno_.getRawValue() ),
+                          this->reader().bytes_buffered() );
+      this->input_.reader().pop( pop_num );
+    }
+
     ackno_ = msg.ackno.value();
 
     // 当前ackno已经超过了之前的
