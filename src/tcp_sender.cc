@@ -16,7 +16,7 @@ uint64_t TCPSender::consecutive_retransmissions() const
 void TCPSender::push( const TransmitFunction& transmit )
 {
   TCPSenderMessage to_trans{seqno_, false, "", false, false };
-  if (!has_SYN)
+  if (!has_SYN) // 还没开始，准备SYN
   {
     to_trans.seqno = isn_;
     to_trans.SYN = true;
@@ -24,23 +24,23 @@ void TCPSender::push( const TransmitFunction& transmit )
     seqno_ = isn_ + 1;
     has_SYN = true;
   }
-  if (this->input_.writer().is_closed())
+  if (this->input_.writer().is_closed()) // 已经被关闭了，准备FIN
   {
     // 测试会调用close方法，就关闭了
     // 发送window_size_ - sequence_numbers_in_flight() - 1
-    if (had_FIN)
+    if (had_FIN) // 发过了就不发了
       return;
 
     auto fake_ackno_ = ackno_;
-    auto fake_segments = outstanding_segments;
-    while (!fake_segments.empty())
+    auto fake_segments = flying_segments;
+    while (!fake_segments.empty()) // 要FIN了，之前发了正在fly的内容，现在也不用发
     {
-      fake_ackno_ = fake_segments.front().first + fake_segments.front().second.size();
+      fake_ackno_ = fake_segments.front().seqno + fake_segments.front().payload.size();
       fake_segments.pop();
     }
     if (this->input_.reader().bytes_buffered() >= window_size_)
       return;
-    // start from fake ackno
+    // start from fake ackno，也就是之前发了一半还存在Byte stream里面的内容，继续发完
     auto push_pos = min( static_cast<uint32_t>(window_size_), fake_ackno_.getRawValue() - ackno_.getRawValue());
 
     to_trans.payload = string(this->input_.reader().peek().substr(push_pos));
@@ -50,7 +50,7 @@ void TCPSender::push( const TransmitFunction& transmit )
 
     had_FIN = true;
   }
-  else if (this->input_.reader().bytes_buffered())
+  else if (this->input_.reader().bytes_buffered()) // 正常情况，被ack了，发ack后面的
   {
     auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
     auto push_num = min( static_cast<uint64_t>(window_size_), this->reader().bytes_buffered() ) -
@@ -60,12 +60,12 @@ void TCPSender::push( const TransmitFunction& transmit )
 
     to_trans.payload = string(this->input_.reader().peek().substr(push_pos, push_num));
 
-    outstanding_segments.emplace( seqno_, string( this->input_.reader().peek().substr( push_pos, push_num ) ) );
     seqno_ = seqno_ + push_num;
   }
   else if (!to_trans.SYN) // 什么都不是
     return;
   transmit( to_trans );
+  flying_segments.push( to_trans );
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
@@ -87,8 +87,8 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     ackno_ = msg.ackno.value();
 
     // 当前ackno已经超过了之前的
-    while (!outstanding_segments.empty() && ackno_.getRawValue() > outstanding_segments.front().first.getRawValue())
-      outstanding_segments.pop();
+    while (!flying_segments.empty() && ackno_.getRawValue() > flying_segments.front().seqno.getRawValue())
+      flying_segments.pop();
   }
   window_size_ = msg.window_size;
   retrans_cnt = 0;
@@ -100,20 +100,21 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
 {
   // retransmit ackno_ to seqno_ - 1
   retrans_timer += ms_since_last_tick;
-  if ( retrans_timer >= retrans_RTO ) {
-    if (window_size_ != 0)
+  if ( retrans_timer >= retrans_RTO )
+  {
+    if (window_size_ != 0) // 重传时间翻倍
       retrans_RTO <<= 1;
-    if ( ackno_ == isn_ )
-      transmit( { isn_, true, "", false, false } );
-    else {
-      if (!outstanding_segments.empty()) {
-        transmit( { outstanding_segments.front().first, false,
-                    outstanding_segments.front().second, false, false } );
-      } else {
-        retrans_cnt = 0;
-        retrans_RTO = initial_RTO_ms_;
-      }
+
+    if (!flying_segments.empty())
+    {
+      transmit( flying_segments.front() ); // 重传第一段
     }
+    else
+    {
+      retrans_cnt = 0;
+      retrans_RTO = initial_RTO_ms_;
+    }
+
     retrans_timer = 0;
     retrans_cnt++;
   }
