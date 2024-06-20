@@ -55,6 +55,8 @@ void TCPSender::push( const TransmitFunction& transmit )
     auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
     auto push_num = min( static_cast<uint64_t>(window_size_), this->reader().bytes_buffered() ) -
                     sequence_numbers_in_flight(); // push的数量
+    push_num = min(push_num, TCPConfig::MAX_PAYLOAD_SIZE);
+
     if (push_num == 0) // 这里不能用make_empty_message方法，因为这里也是用的transmit，所以无需考虑
       return;
 
