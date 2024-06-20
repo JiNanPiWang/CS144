@@ -37,6 +37,9 @@ public:
   /* Time has passed by the given # of milliseconds since the last time the tick() method was called */
   void tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit );
 
+  /* unwarp here with isn_ and total bytes */
+  uint64_t unwrap_seq_num( const Wrap32& num ) const;
+
   // Accessors
   uint64_t sequence_numbers_in_flight() const;  // How many sequence numbers are outstanding?
   uint64_t consecutive_retransmissions() const; // How many consecutive *re*transmissions have happened?

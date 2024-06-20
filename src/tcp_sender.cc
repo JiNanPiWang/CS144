@@ -5,7 +5,7 @@ using namespace std;
 
 uint64_t TCPSender::sequence_numbers_in_flight() const
 {
-  return seqno_.getRawValue() - ackno_.getRawValue();
+  return unwrap_seq_num(seqno_) - unwrap_seq_num(ackno_);
 }
 
 uint64_t TCPSender::consecutive_retransmissions() const
@@ -44,9 +44,9 @@ void TCPSender::push( const TransmitFunction& transmit )
       }
       if ( this->input_.reader().bytes_buffered() >= window_size_ )
         return;
-      // start from fake ackno，也就是之前发了一半还存在Byte stream里面的内容，继续发完
+      // start from fake ackno，也就是之前发了一半还存在Byte stream里面的内容，继续发完，但是是相对地址
       auto push_pos
-        = min( static_cast<uint32_t>( window_size_ ), fake_ackno_.getRawValue() - ackno_.getRawValue() );
+        = min( static_cast<uint64_t>( window_size_ ), unwrap_seq_num(fake_ackno_) - unwrap_seq_num(ackno_) );
 
       to_trans.payload = string( this->input_.reader().peek().substr( push_pos ) );
       to_trans.FIN = true;
@@ -57,7 +57,7 @@ void TCPSender::push( const TransmitFunction& transmit )
     }
     else if ( this->input_.reader().bytes_buffered() ) // 正常情况，被ack了，发ack后面的
     {
-      auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
+      auto push_pos = unwrap_seq_num(seqno_) - unwrap_seq_num(ackno_); // 从buffer的哪里开始push
       auto push_num = min( static_cast<uint64_t>( window_size_ ), this->reader().bytes_buffered() )
                       - sequence_numbers_in_flight(); // push的数量
       push_num = min( push_num, TCPConfig::MAX_PAYLOAD_SIZE );
@@ -87,22 +87,19 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
   if (msg.ackno.has_value()) {
 
     auto &new_ackno = msg.ackno.value();
-    if (new_ackno.getRawValue() < UINT32_MAX - UINT16_MAX)
-    {
-      // 大部分情况下ackno不能大于seqno，除非卡在0左右
-      if (new_ackno.getRawValue() > seqno_.getRawValue())
-        return;
-      // 接收过的信息就不接收了，除非要发FIN
-      if (!flying_segments.empty() && new_ackno.getRawValue() <= flying_segments.front().seqno.getRawValue() &&
-           !this->writer().is_closed())
-        return;
-    }
+    // ackno不能大于seqno
+    if (unwrap_seq_num(new_ackno) > unwrap_seq_num(seqno_))
+      return;
+    // 接收过的信息就不接收了，也就是现在收到的ack必须大于fly第一个的ack，除非要发FIN
+    if (!flying_segments.empty() && unwrap_seq_num(new_ackno) <= unwrap_seq_num(flying_segments.front().seqno) &&
+         !this->writer().is_closed())
+      return;
+
 
     // 如果发过来的不是对SYN的ACK，我们才pop
-    auto absolute_ack_pos = msg.ackno->unwrap(isn_, this->reader().bytes_popped());
-    if (absolute_ack_pos != 1)
+    if (unwrap_seq_num(msg.ackno.value()) != 1)
     {
-      auto pop_num = min( static_cast<uint64_t>( msg.ackno->getRawValue() - ackno_.getRawValue() ),
+      auto pop_num = min( static_cast<uint64_t>( unwrap_seq_num(msg.ackno.value()) - unwrap_seq_num(ackno_) ),
                           this->reader().bytes_buffered() );
       this->input_.reader().pop( pop_num );
     }
@@ -110,7 +107,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     ackno_ = msg.ackno.value();
 
     // 当前ackno已经超过了之前的
-    while (!flying_segments.empty() && ackno_.getRawValue() > flying_segments.front().seqno.getRawValue())
+    while (!flying_segments.empty() && unwrap_seq_num(ackno_) > unwrap_seq_num(flying_segments.front().seqno))
       flying_segments.pop();
   }
   if (msg.window_size != 0)
@@ -121,7 +118,7 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     retrans_RTO = initial_RTO_ms_;
     zero_window = false;
   }
-  else
+  else // window_size = 0，特判
   {
     window_size_ = 1;
     zero_window = true;
@@ -149,4 +146,10 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
     retrans_timer = 0;
     retrans_cnt++;
   }
+}
+
+uint64_t TCPSender::unwrap_seq_num( const Wrap32& num ) const
+{
+  // or this->input_.writer().bytes_pushed()
+  return num.unwrap(isn_, this->input_.reader().bytes_popped());
 }

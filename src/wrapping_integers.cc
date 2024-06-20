@@ -25,8 +25,3 @@ uint64_t Wrap32::unwrap( Wrap32 zero_point, uint64_t checkpoint ) const
     return pos_0 + (n - 1) * max2_32;
   return pos_0 + n * max2_32;
 }
-
-uint32_t Wrap32::getRawValue() const
-{
-  return raw_value_;
-}
