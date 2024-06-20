@@ -15,59 +15,63 @@ uint64_t TCPSender::consecutive_retransmissions() const
 
 void TCPSender::push( const TransmitFunction& transmit )
 {
-  TCPSenderMessage to_trans{seqno_, false, "", false, false };
-  if (!has_SYN) // 还没开始，准备SYN
+  while (sequence_numbers_in_flight() < window_size_)
   {
-    to_trans.seqno = isn_;
-    to_trans.SYN = true;
-    ackno_ = isn_;
-    seqno_ = isn_ + 1;
-    has_SYN = true;
-  }
-  if (this->input_.writer().is_closed()) // 已经被关闭了，准备FIN
-  {
-    // 测试会调用close方法，就关闭了
-    // 发送window_size_ - sequence_numbers_in_flight() - 1
-    if (had_FIN) // 发过了就不发了
-      return;
-
-    auto fake_ackno_ = ackno_;
-    auto fake_segments = flying_segments;
-    while (!fake_segments.empty()) // 要FIN了，之前发了正在fly的内容，现在也不用发
+    TCPSenderMessage to_trans { seqno_, false, "", false, false };
+    if ( !has_SYN ) // 还没开始，准备SYN
     {
-      fake_ackno_ = fake_segments.front().seqno + fake_segments.front().payload.size();
-      fake_segments.pop();
+      to_trans.seqno = isn_;
+      to_trans.SYN = true;
+      ackno_ = isn_;
+      seqno_ = isn_ + 1;
+      has_SYN = true;
     }
-    if (this->input_.reader().bytes_buffered() >= window_size_)
+    if ( this->input_.writer().is_closed() ) // 已经被关闭了，准备FIN
+    {
+      // 测试会调用close方法，就关闭了
+      // 发送window_size_ - sequence_numbers_in_flight() - 1
+      if ( had_FIN ) // 发过了就不发了
+        return;
+
+      auto fake_ackno_ = ackno_;
+      auto fake_segments = flying_segments;
+      while ( !fake_segments.empty() ) // 要FIN了，之前发了正在fly的内容，现在也不用发
+      {
+        fake_ackno_ = fake_segments.front().seqno + fake_segments.front().payload.size();
+        fake_segments.pop();
+      }
+      if ( this->input_.reader().bytes_buffered() >= window_size_ )
+        return;
+      // start from fake ackno，也就是之前发了一半还存在Byte stream里面的内容，继续发完
+      auto push_pos
+        = min( static_cast<uint32_t>( window_size_ ), fake_ackno_.getRawValue() - ackno_.getRawValue() );
+
+      to_trans.payload = string( this->input_.reader().peek().substr( push_pos ) );
+      to_trans.FIN = true;
+
+      seqno_ = seqno_ + this->input_.reader().peek().substr( push_pos ).size() + 1;
+
+      had_FIN = true;
+    }
+    else if ( this->input_.reader().bytes_buffered() ) // 正常情况，被ack了，发ack后面的
+    {
+      auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
+      auto push_num = min( static_cast<uint64_t>( window_size_ ), this->reader().bytes_buffered() )
+                      - sequence_numbers_in_flight(); // push的数量
+      push_num = min( push_num, TCPConfig::MAX_PAYLOAD_SIZE );
+
+      if ( push_num == 0 ) // 这里不能用make_empty_message方法，因为这里也是用的transmit，所以无需考虑
+        return;
+
+      to_trans.payload = string( this->input_.reader().peek().substr( push_pos, push_num ) );
+
+      seqno_ = seqno_ + push_num;
+    }
+    else if ( !to_trans.SYN ) // 什么都不是
       return;
-    // start from fake ackno，也就是之前发了一半还存在Byte stream里面的内容，继续发完
-    auto push_pos = min( static_cast<uint32_t>(window_size_), fake_ackno_.getRawValue() - ackno_.getRawValue());
-
-    to_trans.payload = string(this->input_.reader().peek().substr(push_pos));
-    to_trans.FIN = true;
-
-    seqno_ = seqno_ + this->input_.reader().peek().substr(push_pos).size() + 1;
-
-    had_FIN = true;
+    transmit( to_trans );
+    flying_segments.push( to_trans );
   }
-  else if (this->input_.reader().bytes_buffered()) // 正常情况，被ack了，发ack后面的
-  {
-    auto push_pos = seqno_.getRawValue() - ackno_.getRawValue(); // 从buffer的哪里开始push
-    auto push_num = min( static_cast<uint64_t>(window_size_), this->reader().bytes_buffered() ) -
-                    sequence_numbers_in_flight(); // push的数量
-    push_num = min(push_num, TCPConfig::MAX_PAYLOAD_SIZE);
-
-    if (push_num == 0) // 这里不能用make_empty_message方法，因为这里也是用的transmit，所以无需考虑
-      return;
-
-    to_trans.payload = string(this->input_.reader().peek().substr(push_pos, push_num));
-
-    seqno_ = seqno_ + push_num;
-  }
-  else if (!to_trans.SYN) // 什么都不是
-    return;
-  transmit( to_trans );
-  flying_segments.push( to_trans );
 }
 
 TCPSenderMessage TCPSender::make_empty_message() const
