@@ -113,10 +113,19 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     while (!flying_segments.empty() && ackno_.getRawValue() > flying_segments.front().seqno.getRawValue())
       flying_segments.pop();
   }
-  window_size_ = msg.window_size;
-  retrans_cnt = 0;
-  retrans_timer = 0;
-  retrans_RTO = initial_RTO_ms_;
+  if (msg.window_size != 0)
+  {
+    window_size_ = msg.window_size;
+    retrans_cnt = 0;
+    retrans_timer = 0;
+    retrans_RTO = initial_RTO_ms_;
+    zero_window = false;
+  }
+  else
+  {
+    window_size_ = 1;
+    zero_window = true;
+  }
 }
 
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
@@ -125,7 +134,7 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
   retrans_timer += ms_since_last_tick;
   if ( retrans_timer >= retrans_RTO )
   {
-    if (window_size_ != 0) // 重传时间翻倍
+    if (window_size_ != 0 && !zero_window) // 重传时间翻倍
       retrans_RTO <<= 1;
 
     if (!flying_segments.empty())
@@ -137,7 +146,6 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
       retrans_cnt = 0;
       retrans_RTO = initial_RTO_ms_;
     }
-
     retrans_timer = 0;
     retrans_cnt++;
   }

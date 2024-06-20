@@ -60,4 +60,5 @@ private:
   uint64_t retrans_RTO = 0;
   std::queue<TCPSenderMessage> flying_segments{};
   bool had_FIN = false;
+  bool zero_window = false;
 };
