@@ -87,11 +87,12 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
   if (msg.ackno.has_value()) {
 
     auto &new_ackno = msg.ackno.value();
+    auto &first_fly_ele = flying_segments.front();
     // ackno不能大于seqno
     if (unwrap_seq_num(new_ackno) > unwrap_seq_num(seqno_))
       return;
     // 接收过的信息就不接收了，也就是现在收到的ack必须大于fly第一个的ack，除非要发FIN
-    if (!flying_segments.empty() && unwrap_seq_num(new_ackno) <= unwrap_seq_num(flying_segments.front().seqno) &&
+    if (!flying_segments.empty() && unwrap_seq_num(new_ackno) <= unwrap_seq_num(first_fly_ele.seqno) &&
          !this->writer().is_closed())
       return;
 
