@@ -56,7 +56,7 @@ private:
   ByteStream input_;
   Wrap32 isn_;
   uint64_t initial_RTO_ms_;
-  uint16_t window_size_ = TCPConfig::MAX_PAYLOAD_SIZE + 1; // 比最大的大1
+  uint32_t window_size_ = UINT32_MAX; // 实际上只能有uint16，但是这样就可以判断是否被初始化了
   bool has_SYN = false;
   Wrap32 seqno_{0};
   Wrap32 ackno_{0};

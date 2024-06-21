@@ -27,7 +27,8 @@ void TCPSender::push( const TransmitFunction& transmit )
     {
       to_trans.seqno = isn_;
       to_trans.SYN = true;
-      window_size_ = 1;
+      if (window_size_ == UINT32_MAX) // 如果没被初始化，就初始化
+        window_size_ = 1;
       has_SYN = true;
     }
     // 已经被关闭了，准备FIN，且有空间发FIN；如果buffer大于等于window，那就是普通情况，等一下再发FIN
@@ -51,6 +52,8 @@ void TCPSender::push( const TransmitFunction& transmit )
     auto push_num = this->reader().bytes_buffered() - sequence_numbers_in_flight();
     push_num = min( push_num, window_size_ - sequence_numbers_in_flight());
     push_num = min( push_num, TCPConfig::MAX_PAYLOAD_SIZE );
+    if (push_num && to_trans.SYN)
+      push_num -= to_trans.SYN;
 
     if ( push_num + to_trans.SYN + to_trans.FIN == 0) // 如果所有内容全空，规格错误，就不发送
       return;
@@ -72,7 +75,9 @@ TCPSenderMessage TCPSender::make_empty_message() const
 void TCPSender::receive( const TCPReceiverMessage& msg )
 {
   // receive后，测试的调用会自动触发push
-  if (msg.ackno.has_value()) {
+  if (msg.RST)
+    this->input_.set_error();
+  if (msg.ackno.has_value() && has_SYN) {
 
     auto &new_ackno = msg.ackno.value();
     auto &first_fly_ele = flying_segments.front();
@@ -92,13 +97,13 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
          unwrap_seq_num(new_ackno) - unwrap_seq_num(ackno_) < first_fly_ele.sequence_length())
       return;
 
-    // 如果发过来的不是对SYN的ACK，我们才pop
-    if (unwrap_seq_num(msg.ackno.value()) != 1)
-    {
-      auto pop_num = min( static_cast<uint64_t>( unwrap_seq_num(msg.ackno.value()) - unwrap_seq_num(ackno_) ),
-                          this->reader().bytes_buffered() );
-      this->input_.reader().pop( pop_num );
-    }
+    // 如果发过来的不是对SYN的ACK，我们才pop，syn和data和fin一起
+    if (unwrap_seq_num(ackno_) == 0)
+      ackno_ = ackno_ + 1;
+
+    auto pop_num = min( static_cast<uint64_t>( unwrap_seq_num(msg.ackno.value()) - unwrap_seq_num(ackno_) ),
+                        this->reader().bytes_buffered() );
+    this->input_.reader().pop( pop_num );
 
     ackno_ = msg.ackno.value();
 
