@@ -17,6 +17,9 @@ void TCPSender::push( const TransmitFunction& transmit )
 {
   while (sequence_numbers_in_flight() < window_size_ || (!had_FIN && this->input_.writer().is_closed()) )
   {
+    // FIN会是最后一个消息
+    if (had_FIN)
+      return;
     auto &&buffered_str = this->input_.reader().peek();
     TCPSenderMessage to_trans { seqno_, false, "", false, false };
     if ( !has_SYN ) // 还没开始，准备SYN
@@ -27,7 +30,11 @@ void TCPSender::push( const TransmitFunction& transmit )
       has_SYN = true;
     }
     // 已经被关闭了，准备FIN，且有空间发FIN；如果buffer大于等于window，那就是普通情况，等一下再发FIN
-    if ( this->input_.writer().is_closed() && this->reader().bytes_buffered() < window_size_ )
+    // FIN不占payload的size，但是占window
+    // 需要考虑MAX_PAYLOAD_SIZE，要不然一个10000大小的payload，分成10次发，会每次都带FIN
+    if ( this->input_.writer().is_closed() &&
+         this->reader().bytes_buffered() < window_size_ &&
+         this->reader().bytes_buffered() - sequence_numbers_in_flight() <= TCPConfig::MAX_PAYLOAD_SIZE )
     {
       // 测试会调用close方法，就关闭了
       if ( had_FIN ) // 发过了就不发了
