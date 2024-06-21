@@ -78,6 +78,11 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     if (!flying_segments.empty() && unwrap_seq_num(new_ackno) <= unwrap_seq_num(first_fly_ele.seqno) &&
          !this->writer().is_closed())
       return;
+    // 如果接收的ack不够弹出fly的第一个块，那么ack不算数
+    if (!flying_segments.empty() &&
+         unwrap_seq_num(new_ackno) > unwrap_seq_num(ackno_) &&
+         unwrap_seq_num(new_ackno) - unwrap_seq_num(ackno_) < first_fly_ele.sequence_length())
+      return;
 
     // 如果发过来的不是对SYN的ACK，我们才pop
     if (unwrap_seq_num(msg.ackno.value()) != 1)
