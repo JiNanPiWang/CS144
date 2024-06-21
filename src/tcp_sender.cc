@@ -20,8 +20,9 @@ void TCPSender::push( const TransmitFunction& transmit )
     // FIN会是最后一个消息
     if (had_FIN)
       return;
-    auto &&buffered_str = this->input_.reader().peek();
     TCPSenderMessage to_trans { seqno_, false, "", false, false };
+    if ( this->input_.has_error() )
+      to_trans.RST = true;
     if ( !has_SYN ) // 还没开始，准备SYN
     {
       to_trans.seqno = isn_;
@@ -54,7 +55,7 @@ void TCPSender::push( const TransmitFunction& transmit )
     if ( push_num + to_trans.SYN + to_trans.FIN == 0) // 如果所有内容全空，规格错误，就不发送
       return;
 
-    to_trans.payload = string( buffered_str.substr( push_pos, push_num ) );
+    to_trans.payload = string( this->input_.reader().peek().substr( push_pos, push_num ) );
 
     seqno_ = seqno_ + to_trans.payload.size() + to_trans.SYN + to_trans.FIN;
 
@@ -65,7 +66,7 @@ void TCPSender::push( const TransmitFunction& transmit )
 
 TCPSenderMessage TCPSender::make_empty_message() const
 {
-  return { seqno_, false, "", false, false};
+  return { seqno_, false, "", false, this->input_.has_error()};
 }
 
 void TCPSender::receive( const TCPReceiverMessage& msg )
