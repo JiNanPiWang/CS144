@@ -27,31 +27,21 @@ void TCPSender::push( const TransmitFunction& transmit )
       window_size_ = 1;
       has_SYN = true;
     }
-    // 已经被关闭了，准备FIN，且有空间发FIN
+    // 已经被关闭了，准备FIN，且有空间发FIN；如果buffer大于等于window，那就是普通情况，等一下再发FIN
     if ( this->input_.writer().is_closed() && this->reader().bytes_buffered() < window_size_ )
     {
       // 测试会调用close方法，就关闭了
-      // 发送window_size_ - sequence_numbers_in_flight() - 1
       if ( had_FIN ) // 发过了就不发了
         return;
 
-      auto fake_ackno_ = ackno_;
-      auto fake_segments = flying_segments;
-      while ( !fake_segments.empty() ) // 要FIN了，之前发了正在fly的内容，现在也不用发
-      {
-        fake_ackno_ = fake_segments.front().seqno + fake_segments.front().payload.size();
-        fake_segments.pop();
-      }
-      if ( this->input_.reader().bytes_buffered() >= window_size_ )
-        return;
-      // start from fake ackno，也就是之前发了一半还存在Byte stream里面的内容，继续发完，但是是相对地址
-      auto push_pos
-        = min( static_cast<uint64_t>( window_size_ ), unwrap_seq_num(fake_ackno_) - unwrap_seq_num(ackno_) );
+      // start from last byte + 1，但是如果Bytestream里面只有SYN，那就提取不出来内容，需要取0
+      auto &&now_str = this->input_.reader().peek();
+      auto push_pos = min(now_str.size(), sequence_numbers_in_flight());
 
-      to_trans.payload = string( this->input_.reader().peek().substr( push_pos ) );
+      to_trans.payload = string( now_str.substr( push_pos ) );
       to_trans.FIN = true;
 
-      seqno_ = seqno_ + this->input_.reader().peek().substr( push_pos ).size() + 1;
+      seqno_ = seqno_ + now_str.substr( push_pos ).size() + 1;
 
       had_FIN = true;
     }
@@ -91,11 +81,14 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     // ackno不能大于seqno
     if (unwrap_seq_num(new_ackno) > unwrap_seq_num(seqno_))
       return;
+    // 新的ack也不能小于老的ack，否则无效
+    if ( unwrap_seq_num(new_ackno) < unwrap_seq_num(ackno_))
+      return;
     // 接收过的信息就不接收了，也就是现在收到的ack必须大于fly第一个的ack，除非要发FIN
     if (!flying_segments.empty() && unwrap_seq_num(new_ackno) <= unwrap_seq_num(first_fly_ele.seqno) &&
          !this->writer().is_closed())
       return;
-
+    // 没超时，为什么要重传？FIN II
 
     // 如果发过来的不是对SYN的ACK，我们才pop
     if (unwrap_seq_num(msg.ackno.value()) != 1)
