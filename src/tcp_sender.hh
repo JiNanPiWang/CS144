@@ -19,6 +19,8 @@ public:
   TCPSender( ByteStream&& input, Wrap32 isn, uint64_t initial_RTO_ms )
     : input_( std::move( input ) ), isn_( isn ), initial_RTO_ms_( initial_RTO_ms )
   {
+    seqno_ = isn;
+    ackno_ = isn;
     retrans_RTO = initial_RTO_ms;
   }
 

@@ -22,8 +22,6 @@ void TCPSender::push( const TransmitFunction& transmit )
     {
       to_trans.seqno = isn_;
       to_trans.SYN = true;
-      ackno_ = isn_;
-      seqno_ = isn_ + 1;
       window_size_ = 1;
       has_SYN = true;
     }
@@ -41,8 +39,6 @@ void TCPSender::push( const TransmitFunction& transmit )
       to_trans.payload = string( now_str.substr( push_pos ) );
       to_trans.FIN = true;
 
-      seqno_ = seqno_ + now_str.substr( push_pos ).size() + 1;
-
       had_FIN = true;
     }
     else if ( this->input_.reader().bytes_buffered() ) // 正常情况，被ack了，发ack后面的
@@ -56,11 +52,12 @@ void TCPSender::push( const TransmitFunction& transmit )
         return;
 
       to_trans.payload = string( this->input_.reader().peek().substr( push_pos, push_num ) );
-
-      seqno_ = seqno_ + push_num;
     }
     else if ( !to_trans.SYN ) // 什么都不是
       return;
+
+    seqno_ = seqno_ + to_trans.payload.size() + to_trans.SYN + to_trans.FIN;
+
     transmit( to_trans );
     flying_segments.push( to_trans );
   }
