@@ -49,11 +49,10 @@ void TCPSender::push( const TransmitFunction& transmit )
     auto push_pos = min(this->reader().bytes_buffered(), sequence_numbers_in_flight());
     // push的数量，现在缓存了多少个减去发出还没确认的个数，bytes_buffered肯定是>=sequence_numbers_in_flight的
     // 同时循环也确定了sequence_numbers_in_flight() < window_size_，否则不进行push操作
+    // 减to_trans.SYN的原因是可能SYN和data一起，会占一个位置
     auto push_num = this->reader().bytes_buffered() - sequence_numbers_in_flight();
-    push_num = min( push_num, window_size_ - sequence_numbers_in_flight());
+    push_num = min( push_num, window_size_ - sequence_numbers_in_flight() - to_trans.SYN);
     push_num = min( push_num, TCPConfig::MAX_PAYLOAD_SIZE );
-    if (push_num && to_trans.SYN)
-      push_num -= to_trans.SYN;
 
     if ( push_num + to_trans.SYN + to_trans.FIN == 0) // 如果所有内容全空，规格错误，就不发送
       return;
@@ -129,6 +128,8 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
 void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& transmit )
 {
   // retransmit ackno_ to seqno_ - 1
+  if (flying_segments.empty())
+    return;
   retrans_timer += ms_since_last_tick;
   if ( retrans_timer >= retrans_RTO )
   {
