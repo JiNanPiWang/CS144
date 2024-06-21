@@ -17,6 +17,7 @@ void TCPSender::push( const TransmitFunction& transmit )
 {
   while (sequence_numbers_in_flight() < window_size_ || (!had_FIN && this->input_.writer().is_closed()) )
   {
+    auto &&buffered_str = this->input_.reader().peek();
     TCPSenderMessage to_trans { seqno_, false, "", false, false };
     if ( !has_SYN ) // 还没开始，准备SYN
     {
@@ -31,30 +32,22 @@ void TCPSender::push( const TransmitFunction& transmit )
       // 测试会调用close方法，就关闭了
       if ( had_FIN ) // 发过了就不发了
         return;
-
-      // start from last byte + 1，但是如果Bytestream里面只有SYN，那就提取不出来内容，需要取0
-      auto &&now_str = this->input_.reader().peek();
-      auto push_pos = min(now_str.size(), sequence_numbers_in_flight());
-
-      to_trans.payload = string( now_str.substr( push_pos ) );
       to_trans.FIN = true;
-
       had_FIN = true;
     }
-    else if ( this->input_.reader().bytes_buffered() ) // 正常情况，被ack了，发ack后面的
-    {
-      auto push_pos = unwrap_seq_num(seqno_) - unwrap_seq_num(ackno_); // 从buffer的哪里开始push
-      auto push_num = min( static_cast<uint64_t>( window_size_ ), this->reader().bytes_buffered() )
-                      - sequence_numbers_in_flight(); // push的数量
-      push_num = min( push_num, TCPConfig::MAX_PAYLOAD_SIZE );
 
-      if ( push_num == 0 ) // 这里不能用make_empty_message方法，因为这里也是用的transmit，所以无需考虑
-        return;
+    // start from last byte + 1，但是如果Bytestream里面只有SYN，那就提取不出来内容，需要取min得到0
+    auto push_pos = min(this->reader().bytes_buffered(), sequence_numbers_in_flight());
+    // push的数量，现在缓存了多少个减去发出还没确认的个数，bytes_buffered肯定是>=sequence_numbers_in_flight的
+    // 同时循环也确定了sequence_numbers_in_flight() < window_size_，否则不进行push操作
+    auto push_num = this->reader().bytes_buffered() - sequence_numbers_in_flight();
+    push_num = min( push_num, window_size_ - sequence_numbers_in_flight());
+    push_num = min( push_num, TCPConfig::MAX_PAYLOAD_SIZE );
 
-      to_trans.payload = string( this->input_.reader().peek().substr( push_pos, push_num ) );
-    }
-    else if ( !to_trans.SYN ) // 什么都不是
+    if ( push_num + to_trans.SYN + to_trans.FIN == 0) // 如果所有内容全空，规格错误，就不发送
       return;
+
+    to_trans.payload = string( buffered_str.substr( push_pos, push_num ) );
 
     seqno_ = seqno_ + to_trans.payload.size() + to_trans.SYN + to_trans.FIN;
 
@@ -85,7 +78,6 @@ void TCPSender::receive( const TCPReceiverMessage& msg )
     if (!flying_segments.empty() && unwrap_seq_num(new_ackno) <= unwrap_seq_num(first_fly_ele.seqno) &&
          !this->writer().is_closed())
       return;
-    // 没超时，为什么要重传？FIN II
 
     // 如果发过来的不是对SYN的ACK，我们才pop
     if (unwrap_seq_num(msg.ackno.value()) != 1)
