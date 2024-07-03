@@ -57,7 +57,13 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 void NetworkInterface::recv_frame( const EthernetFrame& frame )
 {
   // Your code here.
-  (void)frame;
+  if (frame.header.type == EthernetHeader::TYPE_ARP)
+  {
+    Parser parser{frame.payload}; // parser使用payload初始化
+    ARPMessage arpMessage;
+    arpMessage.parse( parser ); // ARPMessage的parse函数是把内容解析到该message里面
+
+  }
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
