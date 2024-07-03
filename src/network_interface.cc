@@ -30,6 +30,17 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
   // Your code here.
   (void)dgram;
   (void)next_hop;
+
+  if (arpTable.count(dgram.header.src) == 0)
+  {
+    EthernetFrame arp_fram;
+    arp_fram.header.src = this->ethernet_address_;
+    arp_fram.header.dst = std::array<uint8_t, 6>{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    arp_fram.header.type = EthernetHeader::TYPE_ARP;
+    transmit( arp_fram );
+    return;
+  }
+
 }
 
 //! \param[in] frame the incoming Ethernet frame
