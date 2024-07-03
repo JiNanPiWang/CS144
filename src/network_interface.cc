@@ -31,13 +31,27 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
   (void)dgram;
   (void)next_hop;
 
+  EthernetFrame efram;
+
   if (arpTable.count(dgram.header.src) == 0)
   {
-    EthernetFrame arp_fram;
-    arp_fram.header.src = this->ethernet_address_;
-    arp_fram.header.dst = std::array<uint8_t, 6>{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    arp_fram.header.type = EthernetHeader::TYPE_ARP;
-    transmit( arp_fram );
+    efram.header.src = this->ethernet_address_;
+    efram.header.dst = ETHERNET_BROADCAST;
+    efram.header.type = EthernetHeader::TYPE_ARP;
+
+    ARPMessage arp_fram;
+    arp_fram.sender_ethernet_address = this->ethernet_address_;
+    arp_fram.target_ethernet_address = ETHERNET_BROADCAST;
+    arp_fram.opcode = 1;
+    arp_fram.sender_ip_address = dgram.header.src;
+    arp_fram.target_ip_address = dgram.header.dst;
+
+    Serializer payload_seri{};
+    arp_fram.serialize( payload_seri );
+    efram.payload = payload_seri.output();
+
+    transmit( efram );
+
     return;
   }
 
