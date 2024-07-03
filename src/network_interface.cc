@@ -27,16 +27,12 @@ NetworkInterface::NetworkInterface( string_view name,
 //! can be converted to a uint32_t (raw 32-bit IP address) by using the Address::ipv4_numeric() method.
 void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Address& next_hop )
 {
-  // Your code here.
-  (void)dgram;
-  (void)next_hop;
-
   EthernetFrame efram;
 
   if (arpTable.count(dgram.header.src) == 0)
   {
     efram.header.src = this->ethernet_address_;
-    efram.header.dst = ETHERNET_BROADCAST;
+    efram.header.dst = ETHERNET_BROADCAST; // 发送的是广播地址
     efram.header.type = EthernetHeader::TYPE_ARP;
 
     ARPMessage arp_fram;
@@ -51,7 +47,7 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
     efram.payload = payload_seri.output();
 
     transmit( efram );
-
+    datagrams_received_.push( dgram );
     return;
   }
 
