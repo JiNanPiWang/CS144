@@ -41,10 +41,10 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
     ARPMessage arp_fram;
     arp_fram.sender_ethernet_address = this->ethernet_address_;
-    arp_fram.target_ethernet_address = ETHERNET_BROADCAST;
+    arp_fram.target_ethernet_address = {}; // 默认全0，ARP 请求的目的是发现目标设备的MAC地址，但实际上并不知道目标设备的MAC地址
     arp_fram.opcode = 1;
-    arp_fram.sender_ip_address = dgram.header.src;
-    arp_fram.target_ip_address = dgram.header.dst;
+    arp_fram.sender_ip_address = this->ip_address_.ipv4_numeric();
+    arp_fram.target_ip_address = next_hop.ipv4_numeric();
 
     Serializer payload_seri{};
     arp_fram.serialize( payload_seri );
