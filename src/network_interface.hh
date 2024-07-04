@@ -69,7 +69,7 @@ public:
   static ARPMessage make_arp_fram(uint16_t _opcode,
                              EthernetAddress _sender_ethernet_address, uint32_t _sender_ip_address,
                              EthernetAddress _target_ethernet_address, uint32_t _target_ip_address);
-  static EthernetFrame make_eth_fram_head(EthernetAddress _dst, EthernetAddress _src, uint16_t _type);
+  static EthernetFrame make_eth_fram_head(EthernetAddress _src, EthernetAddress _dst, uint16_t _type);
 
   // 使用 std::void_t 来检查类型是否有 serialize 函数
   template <typename T, typename = void>
