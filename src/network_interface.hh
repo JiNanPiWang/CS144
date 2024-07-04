@@ -101,7 +101,12 @@ private:
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
 
-  std::unordered_map<u_int32_t, EthernetAddress> arp_table {};
+    // 一个arp信息应该同时记录last_update_time
+  std::unordered_map<uint32_t, std::pair<EthernetAddress, size_t>> arp_table {};
+
+  const uint16_t ARP_REQUEST_COOL_DOWN = 5 * 1000;
+  const uint16_t ARP_MAPPING_EXPIRATION = 30 * 1000;
+  std::unordered_map<uint32_t, size_t> last_arp_request_time {};
 
   size_t current_time {};
 
@@ -109,7 +114,6 @@ private:
   {
     const InternetDatagram dgram;
     const Address next_hop;
-    size_t last_attempt_time;
   };
-  std::queue<failed_messages> failed_messages_queue {};
+  std::unordered_multimap<uint32_t, failed_messages> failed_messages_mmap {};
 };

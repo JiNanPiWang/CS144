@@ -29,8 +29,24 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 {
   EthernetFrame efram;
 
-  if (arp_table.count(next_hop.ipv4_numeric()) == 0)
+  // 如果这个arp对应的MAC地址超过了30秒，就重新ARP
+  if (arp_table.contains(next_hop.ipv4_numeric()) &&
+       current_time - arp_table[next_hop.ipv4_numeric()].second > ARP_MAPPING_EXPIRATION)
+    arp_table.erase( next_hop.ipv4_numeric() );
+
+  // 如果对应ip找不到MAC地址，那就进行arp
+  if (!arp_table.contains(next_hop.ipv4_numeric()))
   {
+    failed_messages_mmap.emplace(next_hop.ipv4_numeric(), failed_messages(dgram, next_hop));
+    // 下面决定是否需要发送arp
+    // 如果arp表没有就发，如果arp表有但是超过了时限也发
+    if (!last_arp_request_time.contains(next_hop.ipv4_numeric()))
+      last_arp_request_time[next_hop.ipv4_numeric()] = current_time;
+    else if (current_time - last_arp_request_time[next_hop.ipv4_numeric()] > ARP_REQUEST_COOL_DOWN)
+      ;
+    else
+      return;
+
     // 发送的是广播地址
     efram = NetworkInterface::make_eth_fram_head(this->ethernet_address_,
                                                   ETHERNET_BROADCAST,
@@ -42,15 +58,13 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
                                                            this->ip_address_.ipv4_numeric(),
                                                            {} ,
                                                            next_hop.ipv4_numeric());
-
     efram.payload = serialize( arp_fram );
     transmit( efram );
-    failed_messages_queue.emplace( dgram, next_hop, current_time );
   }
-  else
+  else // 找到了MAC，直接发送
   {
     efram = NetworkInterface::make_eth_fram_head(this->ethernet_address_,
-                                                  arp_table[next_hop.ipv4_numeric()],
+                                                  arp_table[next_hop.ipv4_numeric()].first,
                                                   EthernetHeader::TYPE_IPv4);
     efram.payload = serialize( dgram );
     transmit( efram );
@@ -62,7 +76,7 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 {
   EthernetFrame efram;
 
-  if (frame.header.type == EthernetHeader::TYPE_ARP)
+  if (frame.header.type == EthernetHeader::TYPE_ARP) // 收到ARP
   {
     Parser parser{frame.payload}; // parser使用payload初始化
     ARPMessage arp_fram_recved;
@@ -87,35 +101,24 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
       transmit( efram );
 
       // 收到对方的arp，我们也更新arp表
-      arp_table[arp_fram_recved.sender_ip_address] = arp_fram_recved.sender_ethernet_address;
+      arp_table[arp_fram_recved.sender_ip_address] = { arp_fram_recved.sender_ethernet_address, current_time };
     }
     else if (arp_fram_recved.opcode == ARPMessage::OPCODE_REPLY)  // 得到了对方的MAC
     {
-      arp_table[arp_fram_recved.sender_ip_address] = arp_fram_recved.sender_ethernet_address;
-      auto now_time = current_time;
-      std::queue<failed_messages> queue_tmp;
-      while (!failed_messages_queue.empty() && failed_messages_queue.front().last_attempt_time < now_time)
+      auto new_ip = arp_fram_recved.sender_ip_address;
+      arp_table[new_ip] = { arp_fram_recved.sender_ethernet_address, current_time };
+      auto range = failed_messages_mmap.equal_range( new_ip );
+      vector<failed_messages> message_to_resend;
+      for (auto it = range.first; it != range.second; ++it)
       {
-        if (arp_table.count(failed_messages_queue.front().next_hop.ipv4_numeric()) != 0 ||
-             (now_time - failed_messages_queue.front().last_attempt_time > 5 * 1000)) // ARP查到了或者超时需要重发ARP
-        {
-          send_datagram(failed_messages_queue.front().dgram, failed_messages_queue.front().next_hop);
-          failed_messages_queue.pop();
-        }
-        else // 5秒内发过就不发
-        {
-          queue_tmp.push(failed_messages_queue.front());
-          failed_messages_queue.pop();
-        }
+        message_to_resend.emplace_back(it->second);
       }
-      while (!queue_tmp.empty())
-      {
-        failed_messages_queue.push(queue_tmp.front());
-        queue_tmp.pop();
-      }
+      failed_messages_mmap.erase( new_ip );
+      for (auto &mess : message_to_resend)
+        send_datagram( mess.dgram, mess.next_hop );
     }
   }
-  else if (frame.header.type == EthernetHeader::TYPE_IPv4)
+  else if (frame.header.type == EthernetHeader::TYPE_IPv4) // 收到IP报
   {
     if (frame.header.dst != this->ethernet_address_)
       return;
