@@ -103,12 +103,13 @@ private:
 
   std::unordered_map<u_int32_t, EthernetAddress> arp_table {};
 
-  size_t current_time;
+  size_t current_time {};
+
   struct failed_messages
   {
     const InternetDatagram dgram;
     const Address next_hop;
     size_t last_attempt_time;
   };
-  std::queue<failed_messages> failed_messages_queue;
+  std::queue<failed_messages> failed_messages_queue {};
 };

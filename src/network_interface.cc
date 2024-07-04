@@ -29,7 +29,7 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 {
   EthernetFrame efram;
 
-  if (arp_table.count(dgram.header.src) == 0)
+  if (arp_table.count(next_hop.ipv4_numeric()) == 0)
   {
     // 发送的是广播地址
     efram = NetworkInterface::make_eth_fram_head(this->ethernet_address_,
@@ -46,6 +46,14 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
     efram.payload = serialize( arp_fram );
     transmit( efram );
     failed_messages_queue.emplace( dgram, next_hop, current_time );
+  }
+  else
+  {
+    efram = NetworkInterface::make_eth_fram_head(this->ethernet_address_,
+                                                  arp_table[next_hop.ipv4_numeric()],
+                                                  EthernetHeader::TYPE_IPv4);
+    efram.payload = serialize( dgram );
+    transmit( efram );
   }
 }
 
@@ -74,22 +82,29 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
       efram.payload = serialize( arp_to_send );
       transmit( efram );
     }
-    else // 得到了对方的MAC
+    else if (arp_fram_recved.opcode == ARPMessage::OPCODE_REPLY)  // 得到了对方的MAC
     {
       arp_table[arp_fram_recved.sender_ip_address] = arp_fram_recved.sender_ethernet_address;
       auto now_time = current_time;
-      while (failed_messages_queue.front().last_attempt_time < now_time)
+      std::queue<failed_messages> queue_tmp;
+      while (!failed_messages_queue.empty() && failed_messages_queue.front().last_attempt_time < now_time)
       {
-        if (now_time - failed_messages_queue.front().last_attempt_time > 5 * 1000) // 5秒内mei发过就不发
+        if (arp_table.count(failed_messages_queue.front().next_hop.ipv4_numeric()) != 0 ||
+             (now_time - failed_messages_queue.front().last_attempt_time > 5 * 1000)) // ARP查到了或者超时需要重发ARP
         {
           send_datagram(failed_messages_queue.front().dgram, failed_messages_queue.front().next_hop);
           failed_messages_queue.pop();
         }
-        else
+        else // 5秒内发过就不发
         {
-          failed_messages_queue.push(failed_messages_queue.front());
+          queue_tmp.push(failed_messages_queue.front());
           failed_messages_queue.pop();
         }
+      }
+      while (!queue_tmp.empty())
+      {
+        failed_messages_queue.push(queue_tmp.front());
+        queue_tmp.pop();
       }
     }
   }
