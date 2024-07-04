@@ -29,7 +29,7 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 {
   EthernetFrame efram;
 
-  if (arpTable.count(dgram.header.src) == 0)
+  if (arp_table.count(dgram.header.src) == 0)
   {
     // 发送的是广播地址
     efram = NetworkInterface::make_eth_fram_head(this->ethernet_address_,
@@ -44,9 +44,8 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
                                                            next_hop.ipv4_numeric());
 
     efram.payload = serialize( arp_fram );
-
     transmit( efram );
-    return;
+    failed_messages_queue.emplace( dgram, next_hop, current_time );
   }
 }
 
@@ -61,7 +60,7 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
     ARPMessage arp_fram_recved;
     arp_fram_recved.parse( parser ); // ARPMessage的parse函数是把内容解析到该message里面
 
-    if (arp_fram_recved.opcode == ARPMessage::OPCODE_REQUEST)
+    if (arp_fram_recved.opcode == ARPMessage::OPCODE_REQUEST) // 需要我们返回MAC
     {
       // 回复自己的MAC地址
       ARPMessage arp_to_send = make_arp_fram(ARPMessage::OPCODE_REPLY,
@@ -74,7 +73,24 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
                                                     EthernetHeader::TYPE_ARP );
       efram.payload = serialize( arp_to_send );
       transmit( efram );
-      return;
+    }
+    else // 得到了对方的MAC
+    {
+      arp_table[arp_fram_recved.sender_ip_address] = arp_fram_recved.sender_ethernet_address;
+      auto now_time = current_time;
+      while (failed_messages_queue.front().last_attempt_time < now_time)
+      {
+        if (now_time - failed_messages_queue.front().last_attempt_time > 5 * 1000) // 5秒内mei发过就不发
+        {
+          send_datagram(failed_messages_queue.front().dgram, failed_messages_queue.front().next_hop);
+          failed_messages_queue.pop();
+        }
+        else
+        {
+          failed_messages_queue.push(failed_messages_queue.front());
+          failed_messages_queue.pop();
+        }
+      }
     }
   }
 }
@@ -82,8 +98,7 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
-  // Your code here.
-  (void)ms_since_last_tick;
+  current_time += ms_since_last_tick;
 }
 
 EthernetFrame NetworkInterface::make_eth_fram_head(EthernetAddress _src, EthernetAddress _dst, uint16_t _type)

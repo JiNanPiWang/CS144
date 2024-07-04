@@ -101,5 +101,14 @@ private:
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
 
-  std::unordered_map<u_int32_t, EthernetAddress> arpTable {};
+  std::unordered_map<u_int32_t, EthernetAddress> arp_table {};
+
+  size_t current_time;
+  struct failed_messages
+  {
+    const InternetDatagram dgram;
+    const Address next_hop;
+    size_t last_attempt_time;
+  };
+  std::queue<failed_messages> failed_messages_queue;
 };
