@@ -31,26 +31,24 @@ void NetworkInterface::send_datagram( const InternetDatagram& dgram, const Addre
 
   if (arpTable.count(dgram.header.src) == 0)
   {
-    efram.header.src = this->ethernet_address_;
-    efram.header.dst = ETHERNET_BROADCAST; // 发送的是广播地址
-    efram.header.type = EthernetHeader::TYPE_ARP;
+    // 发送的是广播地址
+    efram = NetworkInterface::make_eth_fram_head(ETHERNET_BROADCAST,
+                                                  this->ethernet_address_,
+                                                  EthernetHeader::TYPE_ARP);
 
-    ARPMessage arp_fram;
-    arp_fram.sender_ethernet_address = this->ethernet_address_;
-    arp_fram.target_ethernet_address = {}; // 默认全0，ARP 请求的目的是发现目标设备的MAC地址，但实际上并不知道目标设备的MAC地址
-    arp_fram.opcode = 1;
-    arp_fram.sender_ip_address = this->ip_address_.ipv4_numeric();
-    arp_fram.target_ip_address = next_hop.ipv4_numeric();
+    // target_ethernet_address默认全0，ARP 请求的目的是发现目标设备的MAC地址，但实际上并不知道目标设备的MAC地址
+    ARPMessage arp_fram = NetworkInterface::make_arp_fram(ARPMessage::OPCODE_REQUEST,
+                                                           this->ethernet_address_,
+                                                           this->ip_address_.ipv4_numeric(),
+                                                           {} ,
+                                                           next_hop.ipv4_numeric());
 
-    Serializer payload_seri{};
-    arp_fram.serialize( payload_seri );
-    efram.payload = payload_seri.output();
+    efram.payload = serialize( arp_fram );
 
     transmit( efram );
     datagrams_received_.push( dgram );
     return;
   }
-
 }
 
 //! \param[in] frame the incoming Ethernet frame
@@ -71,4 +69,35 @@ void NetworkInterface::tick( const size_t ms_since_last_tick )
 {
   // Your code here.
   (void)ms_since_last_tick;
+}
+
+EthernetFrame NetworkInterface::make_eth_fram_head(EthernetAddress _dst, EthernetAddress _src, uint16_t _type)
+{
+  EthernetFrame ethernetFrame;
+  ethernetFrame.header.src = _src;
+  ethernetFrame.header.dst = _dst;
+  ethernetFrame.header.type = _type;
+  return ethernetFrame;
+}
+
+ARPMessage NetworkInterface::make_arp_fram(uint16_t _opcode,
+                           EthernetAddress _sender_ethernet_address, uint32_t _sender_ip_address,
+                           EthernetAddress _target_ethernet_address, uint32_t _target_ip_address)
+{
+  ARPMessage arp_fram;
+  arp_fram.opcode = _opcode;
+  arp_fram.sender_ethernet_address = _sender_ethernet_address;
+  arp_fram.sender_ip_address = _sender_ip_address;
+  arp_fram.target_ethernet_address = _target_ethernet_address;
+  arp_fram.target_ip_address = _target_ip_address;
+  return arp_fram;
+}
+
+template<typename T>
+requires NetworkInterface::has_serialize_function<T>::value
+auto serialize(T &frame)
+{
+  Serializer payload_seri{};
+  frame.serialize( payload_seri );
+  return payload_seri.output();
 }
