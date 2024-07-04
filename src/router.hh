@@ -32,7 +32,17 @@ public:
   // Route packets between the interfaces
   void route();
 
+  uint32_t find_next_ip(uint32_t src_ip);
+
 private:
   // The router's collection of network interfaces
   std::vector<std::shared_ptr<NetworkInterface>> _interfaces {};
+  struct next_route
+  {
+    uint32_t route_prefix;
+    uint8_t prefix_length;
+    std::optional<Address> next_hop;
+    size_t interface_num;
+  };
+  std::vector<next_route> route_table {};
 };
