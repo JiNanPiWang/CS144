@@ -108,6 +108,15 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
       }
     }
   }
+  else if (frame.header.type == EthernetHeader::TYPE_IPv4)
+  {
+    Parser parser{frame.payload};
+    IPv4Datagram ip_fram_recved;
+    ip_fram_recved.parse( parser );
+
+    if (frame.header.dst == this->ethernet_address_)
+      this->datagrams_received_.push(ip_fram_recved);
+  }
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
