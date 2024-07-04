@@ -68,6 +68,10 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
     ARPMessage arp_fram_recved;
     arp_fram_recved.parse( parser ); // ARPMessage的parse函数是把内容解析到该message里面
 
+    // arp是通过ip找MAC，如果发来的ip不是找我们的，那就不管
+    if (arp_fram_recved.target_ip_address != this->ip_address_.ipv4_numeric())
+      return;
+
     if (arp_fram_recved.opcode == ARPMessage::OPCODE_REQUEST) // 需要我们返回MAC
     {
       // 回复自己的MAC地址
@@ -81,6 +85,9 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
                                                     EthernetHeader::TYPE_ARP );
       efram.payload = serialize( arp_to_send );
       transmit( efram );
+
+      // 收到对方的arp，我们也更新arp表
+      arp_table[arp_fram_recved.sender_ip_address] = arp_fram_recved.sender_ethernet_address;
     }
     else if (arp_fram_recved.opcode == ARPMessage::OPCODE_REPLY)  // 得到了对方的MAC
     {
@@ -110,12 +117,12 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
   }
   else if (frame.header.type == EthernetHeader::TYPE_IPv4)
   {
+    if (frame.header.dst != this->ethernet_address_)
+      return;
     Parser parser{frame.payload};
     IPv4Datagram ip_fram_recved;
     ip_fram_recved.parse( parser );
-
-    if (frame.header.dst == this->ethernet_address_)
-      this->datagrams_received_.push(ip_fram_recved);
+    this->datagrams_received_.push(ip_fram_recved);
   }
 }
 
