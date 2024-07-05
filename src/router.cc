@@ -46,8 +46,17 @@ void Router::route()
         auto next_interface_id = find_next_interface( datagram.header.dst );
         auto &next_interface = *interface( next_interface_id );
 
-        datagram.header.ttl--;
-        next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
+        // TODO：特殊处理id=0的default_router
+        // TODO：处理next hop
+
+
+        if (next_interface.name() != network_interface.name()) // 如果不在我们的网段内，我们就直接”给“下一个路由器
+        {
+          datagram.header.ttl--;
+          next_interface.datagrams_received().push( datagram );
+        }
+        else // 如果在我们的网段内，我们就直接发送
+          next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
 
         // network_interface.send_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
         datagrams.pop();
