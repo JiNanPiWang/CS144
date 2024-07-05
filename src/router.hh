@@ -32,7 +32,10 @@ public:
   // Route packets between the interfaces
   void route();
 
-  uint32_t find_next_ip(uint32_t src_ip);
+private:
+
+  size_t find_next_interface(uint32_t dst_ip);
+
 
 private:
   // The router's collection of network interfaces

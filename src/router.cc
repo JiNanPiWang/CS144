@@ -23,40 +23,47 @@ void Router::add_route( const uint32_t route_prefix,
   route_table.emplace_back( route_prefix, prefix_length, next_hop, interface_num );
 }
 
-uint32_t Router::find_next_ip(uint32_t src_ip)
-{
-  auto best_route = route_table[0];
-  for (auto route : route_table)
-  {
-    auto prefix_len = route.prefix_length;
-    if ((src_ip & (1 << prefix_len)) == route.route_prefix && best_route.prefix_length <= prefix_len)
-    {
-      best_route = route;
-    }
-  }
-  return best_route.route_prefix;
-}
-
 // Go through all the interfaces, and route every incoming datagram to its proper outgoing interface.
 // 遍历这个路由器得到的包，并转发出去
 // 路由器通常具有多个网络接口，比如WAN、LAN
 void Router::route()
 {
-  for (auto &interface_ptr : this->_interfaces)
+  bool all_messages_done = true;
+  do
   {
-    // 每个网络接口都有自己的ip和MAC地址，我们需要帮它找到下一个传输的ip，然后把所有的信息继续传递
-    auto network_interface = *interface_ptr;
-    auto &datagrams = network_interface.datagrams_received();
-    while (!datagrams.empty())
+    for ( auto& interface_ptr : this->_interfaces ) {
+      // 每个网络接口都有自己的ip和MAC地址，我们需要帮它找到下一个传输的ip，然后把所有的信息继续传递
+      // 路由器直接把这条消息”给“对应的网络接口
+      auto &network_interface = *interface_ptr;
+      auto &datagrams = network_interface.datagrams_received();
+      if ( datagrams.empty() )
+        continue;
+      while (!datagrams.empty())
+      {
+        auto datagram = datagrams.front();
+        all_messages_done = false;
+        auto next_interface_id = find_next_interface( datagram.header.dst );
+        auto next_interface = *interface( next_interface_id );
+        next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
+
+        // network_interface.send_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
+        datagrams.pop();
+      }
+    }
+  } while (!all_messages_done);
+}
+
+size_t Router::find_next_interface(uint32_t dst_ip)
+{
+  auto best_route = route_table[0];
+  for (auto route : route_table)
+  {
+    auto prefix_len = route.prefix_length;
+    uint32_t mask = UINT32_MAX - ((1ULL << (32 - prefix_len)) - 1);
+    if ((dst_ip & (mask)) == route.route_prefix && best_route.prefix_length <= prefix_len)
     {
-      auto &packet = datagrams.front();
-      auto dst_ip = packet.header.dst;
-
-      // 找到下一跳ip
-      auto next_hop_ip = find_next_ip(dst_ip);
-      network_interface.send_datagram( packet, Address::from_ipv4_numeric( next_hop_ip ) );
-
-      datagrams.pop();
+      best_route = route;
     }
   }
+  return best_route.interface_num;
 }
