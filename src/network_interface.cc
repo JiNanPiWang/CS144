@@ -85,6 +85,8 @@ void NetworkInterface::recv_frame( const EthernetFrame& frame )
     // arp是通过ip找MAC，如果发来的ip不是找我们的，那就不管
     if (arp_fram_recved.target_ip_address != this->ip_address_.ipv4_numeric())
       return;
+    if (arp_fram_recved.sender_ethernet_address == this->ethernet_address_) // 发给自己不算
+      return;
 
     if (arp_fram_recved.opcode == ARPMessage::OPCODE_REQUEST) // 需要我们返回MAC
     {
@@ -157,8 +159,21 @@ ARPMessage NetworkInterface::make_arp_fram(uint16_t _opcode,
   return arp_fram;
 }
 
+
+// 使用 std::void_t 来检查类型是否有 serialize 函数
+template <typename T, typename = void>
+struct has_serialize_function : std::false_type {};
+
+// std::declval主要用途是生成一个类型 T 的右值引用（Rvalue reference），但不实际创建任何对象。
+// decltype(std::declval<T>().serialize()) 获取的是 T 类型的 serialize 成员函数的类型。
+// std::void_t 是一个 C++17 中的工具模板，它接受任意数量的模板参数，并且对每个参数都返回 void。
+// 如果 serialize 成员函数存在且可访问，则这里的 void_t 将返回 void；
+// 否则，它会导致 SFINAE（Substitution Failure Is Not An Error）机制导致模板参数推断失败。
+template <typename T>
+struct has_serialize_function<T, std::void_t<decltype(std::declval<T>().serialize())>> : std::true_type {};
+
 template<typename T>
-requires NetworkInterface::has_serialize_function<T>::value
+requires has_serialize_function<T>::value
 auto serialize(T &frame)
 {
   Serializer payload_seri{};
