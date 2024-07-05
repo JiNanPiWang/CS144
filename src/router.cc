@@ -45,6 +45,8 @@ void Router::route()
         all_messages_done = false;
         auto next_interface_id = find_next_interface( datagram.header.dst );
         auto &next_interface = *interface( next_interface_id );
+
+        datagram.header.ttl--;
         next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
 
         // network_interface.send_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
