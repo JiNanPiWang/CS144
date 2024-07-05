@@ -31,6 +31,7 @@ void Router::route()
   bool all_messages_done = true;
   do
   {
+    all_messages_done = true;
     for ( auto& interface_ptr : this->_interfaces ) {
       // 每个网络接口都有自己的ip和MAC地址，我们需要帮它找到下一个传输的ip，然后把所有的信息继续传递
       // 路由器直接把这条消息”给“对应的网络接口
@@ -49,6 +50,8 @@ void Router::route()
         // network_interface.send_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
         datagrams.pop();
       }
+      if (all_messages_done)
+        break;
     }
   } while (!all_messages_done);
 }
