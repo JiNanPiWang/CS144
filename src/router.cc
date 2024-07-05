@@ -43,7 +43,7 @@ void Router::route()
         auto datagram = datagrams.front();
         all_messages_done = false;
         auto next_interface_id = find_next_interface( datagram.header.dst );
-        auto next_interface = *interface( next_interface_id );
+        auto &next_interface = *interface( next_interface_id );
         next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
 
         // network_interface.send_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
