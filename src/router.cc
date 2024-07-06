@@ -46,15 +46,11 @@ void Router::route()
         auto next_interface_route = find_next_interface( datagram.header.dst );
         auto &next_interface = *interface( next_interface_route.interface_num );
 
-        // TODO：特殊处理id=0的default_router
-        // TODO：处理next hop
-
-
         if (next_interface.name() != network_interface.name()) // 如果不在我们的网段内，我们就直接”给“下一个路由器
         {
-          datagram.header.ttl--;
           if (next_interface_route.next_hop.has_value())
           {
+            datagram.header.ttl--;
             next_interface.send_datagram( datagram,
                                           Address::from_ipv4_numeric(
                                             next_interface_route.next_hop.value().ipv4_numeric()) );
@@ -65,9 +61,11 @@ void Router::route()
           }
         }
         else // 如果在我们的网段内，我们就直接发送
+        {
+          datagram.header.ttl--;
           next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
+        }
 
-        // network_interfacsend_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
         datagrams.pop();
       }
       if (all_messages_done)
