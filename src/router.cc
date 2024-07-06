@@ -42,15 +42,25 @@ void Router::route()
       while (!datagrams.empty())
       {
         auto datagram = datagrams.front();
+        if (datagram.header.ttl == 0)
+        {
+          datagrams.pop();
+          break;
+        }
         all_messages_done = false;
         auto next_interface_route = find_next_interface( datagram.header.dst );
         auto &next_interface = *interface( next_interface_route.interface_num );
 
         if (next_interface.name() != network_interface.name()) // 如果不在我们的网段内，我们就直接”给“下一个路由器
         {
-          if (next_interface_route.next_hop.has_value())
+          if (next_interface_route.next_hop.has_value()) // 如果有下一跳，那我们需要通过ip传给它
           {
             datagram.header.ttl--;
+            if (datagram.header.ttl == 0)
+            {
+              datagrams.pop();
+              break;
+            }
             next_interface.send_datagram( datagram,
                                           Address::from_ipv4_numeric(
                                             next_interface_route.next_hop.value().ipv4_numeric()) );
@@ -63,11 +73,17 @@ void Router::route()
         else // 如果在我们的网段内，我们就直接发送
         {
           datagram.header.ttl--;
+          if (datagram.header.ttl == 0)
+          {
+            datagrams.pop();
+            break;
+          }
           next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
         }
 
         datagrams.pop();
       }
+
       if (all_messages_done)
         break;
     }
@@ -88,3 +104,4 @@ Router::next_route Router::find_next_interface(uint32_t dst_ip)
   }
   return best_route;
 }
+
