@@ -33,13 +33,6 @@ public:
   void route();
 
 private:
-
-  size_t find_next_interface(uint32_t dst_ip);
-
-
-private:
-  // The router's collection of network interfaces
-  std::vector<std::shared_ptr<NetworkInterface>> _interfaces {};
   struct next_route
   {
     uint32_t route_prefix;
@@ -47,5 +40,11 @@ private:
     std::optional<Address> next_hop;
     size_t interface_num;
   };
+  next_route find_next_interface(uint32_t dst_ip);
+
+
+private:
+  // The router's collection of network interfaces
+  std::vector<std::shared_ptr<NetworkInterface>> _interfaces {};
   std::vector<next_route> route_table {};
 };

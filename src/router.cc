@@ -43,8 +43,8 @@ void Router::route()
       {
         auto datagram = datagrams.front();
         all_messages_done = false;
-        auto next_interface_id = find_next_interface( datagram.header.dst );
-        auto &next_interface = *interface( next_interface_id );
+        auto next_interface_route = find_next_interface( datagram.header.dst );
+        auto &next_interface = *interface( next_interface_route.interface_num );
 
         // TODO：特殊处理id=0的default_router
         // TODO：处理next hop
@@ -53,12 +53,21 @@ void Router::route()
         if (next_interface.name() != network_interface.name()) // 如果不在我们的网段内，我们就直接”给“下一个路由器
         {
           datagram.header.ttl--;
-          next_interface.datagrams_received().push( datagram );
+          if (next_interface_route.next_hop.has_value())
+          {
+            next_interface.send_datagram( datagram,
+                                          Address::from_ipv4_numeric(
+                                            next_interface_route.next_hop.value().ipv4_numeric()) );
+          }
+          else
+          {
+            next_interface.datagrams_received().push( datagram );
+          }
         }
         else // 如果在我们的网段内，我们就直接发送
           next_interface.send_datagram( datagram, Address::from_ipv4_numeric(datagram.header.dst) );
 
-        // network_interface.send_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
+        // network_interfacsend_datagram( datagram, Address::from_ipv4_numeric(next_ip) );
         datagrams.pop();
       }
       if (all_messages_done)
@@ -67,7 +76,7 @@ void Router::route()
   } while (!all_messages_done);
 }
 
-size_t Router::find_next_interface(uint32_t dst_ip)
+Router::next_route Router::find_next_interface(uint32_t dst_ip)
 {
   auto best_route = route_table[0];
   for (auto route : route_table)
@@ -79,5 +88,5 @@ size_t Router::find_next_interface(uint32_t dst_ip)
       best_route = route;
     }
   }
-  return best_route.interface_num;
+  return best_route;
 }
