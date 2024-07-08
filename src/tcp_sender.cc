@@ -134,7 +134,11 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
   if ( retrans_timer >= retrans_RTO )
   {
     if (window_size_ != 0 && !zero_window) // 重传时间翻倍
+    {
       retrans_RTO <<= 1;
+      retrans_cnt++;
+    }
+    retrans_timer = 0;
 
     if (!flying_segments.empty())
     {
@@ -145,8 +149,6 @@ void TCPSender::tick( uint64_t ms_since_last_tick, const TransmitFunction& trans
       retrans_cnt = 0;
       retrans_RTO = initial_RTO_ms_;
     }
-    retrans_timer = 0;
-    retrans_cnt++;
   }
 }
 
